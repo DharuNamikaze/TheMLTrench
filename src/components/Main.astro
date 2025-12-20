@@ -2,20 +2,17 @@
 import "../pages/_ocean.css";
 import { mlConcepts, depthMarkers, zones } from "../data/mlconcepts.js";
 
-// determine sizes for images
-function getImageSize(size: string) {
-  if (size === "large") return { width: 98, height: 98 };
-  if (size === "medium") return { width: 58, height: 58 };
-  return { width: 40, height: 40 }; // small
+function getNodeClass(size: string) {
+  if (size === "large") return "node-large";
+  if (size === "medium") return "node-medium";
+  return "node-small";
 }
-
 ---
 
 <main>
-  <!-- Hero -->
   <section class="hero-section">
     <div class="title-container">
-      <h1>The Deep Trench</h1>
+      <h1>The ML Trench</h1>
       <h2>
         by
         <span>
@@ -43,7 +40,6 @@ function getImageSize(size: string) {
 
   <section class="ocean-section">
     <div class="ocean-container">
-      <!-- Zone Labels -->
       {
         zones.map((zone) => (
           <div class="zone-label" style={`top: ${zone.start + 100}px;`}>
@@ -52,7 +48,6 @@ function getImageSize(size: string) {
         ))
       }
 
-      <!-- Depth Markers -->
       {
         depthMarkers.map((depth) => (
           <span class="depth-marker" style={`top: ${depth}px;`}>
@@ -61,34 +56,33 @@ function getImageSize(size: string) {
         ))
       }
 
-      <!-- ML Concepts -->
       {
-        mlConcepts.map((concept, index) => {
-          const { width, height } = getImageSize(concept.size);
+        mlConcepts.map((concept) => {
+          const nodeClass = getNodeClass(concept.size);
 
           return (
             <div
-              class={`ml-concept ${concept.size}`}
+              class={`ml-concept ${nodeClass}`}
               style={`top: ${concept.depth}px;`}
               data-name={concept.name}
               data-depth={String(concept.depth)}
             >
-              <div class="concept-image-container">
-                <img
-                  src={concept.image}
-                  alt={concept.name}
-                  width={width}
-                  height={height}
-                  loading={index < 5 ? "eager" : "lazy"}
-                  decoding="async"
-                  class="concept-image rounded-lg"
-                />
+              <div class="concept-node">
+                <div class="node-core"></div>
+                <div class="node-glow"></div>
               </div>
+              
+              <span class="concept-name-label">{concept.name}</span>
 
               <div class="concept-info">
                 <h3>{concept.name}</h3>
                 <p>{concept.description}</p>
-                <span class="concept-category">{concept.category}</span>
+                <div class="meta-row">
+                  <span class="concept-category">{concept.category}</span>
+                  <a href={concept.link} target="_blank" rel="noopener noreferrer" class="paper-link">
+                    Read Paper ↗
+                  </a>
+                </div>
               </div>
             </div>
           );
@@ -99,7 +93,6 @@ function getImageSize(size: string) {
 </main>
 
 <script>
-  // Intersection Observer animations
   const concepts = document.querySelectorAll(".ml-concept");
 
   const conceptObserver = new IntersectionObserver(
@@ -114,12 +107,4 @@ function getImageSize(size: string) {
   );
 
   concepts.forEach((concept) => conceptObserver.observe(concept));
-
-  // Optional click logger
-  concepts.forEach((concept) => {
-    concept.addEventListener("click", () => {
-      const el = concept as HTMLElement;
-      console.log(`Clicked: ${el.dataset.name} at depth ${el.dataset.depth}m`);
-    });
-  });
 </script>

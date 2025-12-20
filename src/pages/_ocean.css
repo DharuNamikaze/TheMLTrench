@@ -1,8 +1,28 @@
+/* src/pages/_ocean.css */
+
 /* Reset default margins and ensure full width */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Custom Thin Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 body,
@@ -11,39 +31,25 @@ html {
   padding: 0 !important;
   width: 100vw;
   overflow-x: hidden;
+  background-color: #000;
+  color: white;
+  /* Firefox Scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
 main {
-  margin: 0;
-  padding: 0;
   width: 100vw;
   overflow-x: hidden;
 }
 
-/* Wave animation: horizontal scroll effect */
-@keyframes wave {
-  0% {
-    background-position: 0% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-/* Slower wave for layering effect */
+/* Wave animation */
 @keyframes wave-slow {
-  0% {
-    background-position: 0% center;
-  }
-  125% {
-    background-position: 100%;
-  }
-  100% {
-    background-position: 200% center;
-  }
+  0% { background-position: 0% center; }
+  125% { background-position: 100%; }
+  100% { background-position: 200% center; }
 }
 
-/* Container for wave effect */
 .wave-border {
   position: relative;
   top: -75px;
@@ -51,7 +57,6 @@ main {
   width: 100vw;
 }
 
-/* Wave animation div */
 .wave-border::before {
   content: "";
   position: absolute;
@@ -70,51 +75,58 @@ main {
   background: linear-gradient(to top, #fef3c7, #fffbeb);
   height: 82vh;
   width: 100vw;
-  margin: 0;
-  padding: 0;
+  color: #1a1a1a;
 }
 
 /* Ocean section */
 .ocean-section {
   position: relative;
-  background: linear-gradient(180deg, #17bdff 0%, #1e3a8a 50%, #000000 100%);
-  min-height: 18550px;
+  background: linear-gradient(
+    180deg, 
+    #4fc3f7 0%,    /* Base */
+    #29b6f6 12%,   /* Level 2 */
+    #0288d1 25%,   /* Level 3 */
+    #01579b 37%,   /* Level 4 */
+    #1a237e 50%,   /* Level 5 */
+    #311b92 62%,   /* Level 6 */
+    #000051 75%,   /* Level 7 */
+    #000000 90%    /* Level 8 */
+  );
+  min-height: 16500px;
   width: 100vw;
-  margin: 0;
-  padding: 0;
 }
 
-/* Ocean container styling */
 .ocean-container {
   position: relative;
   width: 100%;
-  height: 18300px; /* Total depth */
+  height: 16500px;
+  max-width: 1400px; /* Constrain max width for very large screens */
+  margin: 0 auto;
 }
 
-/* Depth markers styling */
 .depth-marker {
   position: absolute;
   left: 20px;
   font-family: monospace;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.4);
   font-weight: bold;
   z-index: 10;
   pointer-events: none;
 }
 
-/* ML Concept container */
+/* --- ML CONCEPT NODES --- */
 .ml-concept {
   position: absolute;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 15px;
   opacity: 0;
   transform: translateY(30px);
-  transition:
-    opacity 0.8s ease,
-    transform 0.8s ease;
+  transition: opacity 0.8s ease, transform 0.8s ease;
   cursor: pointer;
+  width: max-content;
+  max-width: 300px;
 }
 
 .ml-concept.visible {
@@ -122,173 +134,129 @@ main {
   transform: translateY(0);
 }
 
-/* Concept positioning - scattered horizontally on large screens */
-.ml-concept:nth-child(6n + 1) {
-  left: 10%;
-}
-
-.ml-concept:nth-child(6n + 2) {
-  left: 30%;
-}
-
-.ml-concept:nth-child(6n + 3) {
-  left: 50%;
-  transform: translateX(-50%) translateY(30px);
-}
-
-.ml-concept.visible:nth-child(6n + 3) {
-  transform: translateX(-50%) translateY(0);
-}
-
-.ml-concept:nth-child(6n + 4) {
-  right: 30%;
-}
-
-.ml-concept:nth-child(6n + 5) {
-  right: 10%;
-}
-
-.ml-concept:nth-child(6n) {
-  left: 20%;
-}
-
-/* Responsive: Container with centered content on small screens */
-@media (max-width: 768px) {
-  .ocean-section {
-    padding: 0 1rem;
-  }
-
-  .ocean-container {
-    max-width: 500px;
-    margin: 0 auto;
-  }
-
-  /* Keep scattered positioning on mobile, just within smaller container */
-  .ml-concept:nth-child(6n + 1) {
-    left: 15%;
-  }
-
-  .ml-concept:nth-child(6n + 2) {
-    left: 25%;
-  }
-
-  .ml-concept:nth-child(6n + 3) {
-    left: 50%;
-    transform: translateX(-50%) translateY(30px);
-  }
-
-  .ml-concept.visible:nth-child(6n + 3) {
-    transform: translateX(-50%) translateY(0);
-  }
-
-  .ml-concept:nth-child(6n + 4) {
-    right: 25%;
-  }
-
-  .ml-concept:nth-child(6n + 5) {
-    right: 15%;
-  }
-
-  .ml-concept:nth-child(6n) {
-    left: 35%;
-  }
-
-  .depth-marker {
-    left: 10px;
-    font-size: 12px;
-  }
-}
-
-/* Extra small screens */
-@media (max-width: 480px) {
-  .ocean-container {
-    max-width: 100%;
-    padding: 0 0.5rem;
-  }
-}
-
-/* Image container with glow effect */
-.concept-image-container {
+/* Node Design */
+.concept-node {
   position: relative;
-  border-radius: 12px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.ml-concept:hover .concept-image-container {
-  background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.05);
+.node-core {
+  background-color: #fff;
+  border-radius: 50%;
+  z-index: 2;
+  box-shadow: 0 0 10px #fff;
+  width: 14px; 
+  height: 14px;
 }
 
-/* Image sizing based on importance */
-.ml-concept.large .concept-image-container {
-  width: 150px;
-  height: 150px;
+.node-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 250%;
+  height: 250%;
+  background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
+  border-radius: 50%;
+  animation: pulse 4s infinite ease-in-out;
 }
 
-.ml-concept.medium .concept-image-container {
-  width: 100px;
-  height: 100px;
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.3; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.3; }
 }
 
-.ml-concept.small .concept-image-container {
-  width: 60px;
-  height: 60px;
+/* Labels */
+.concept-name-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: sans-serif;
+  font-weight: 500;
+  text-shadow: 0 0 5px rgba(0,0,0,0.8);
+  font-size: 15px;
+  white-space: normal;
 }
 
-/* Responsive: Smaller images on mobile */
-@media (max-width: 768px) {
-  .ml-concept.large .concept-image-container {
-    width: 120px;
-    height: 120px;
-  }
+/* =================================================================
+   DESKTOP NATURAL POSITIONING (Screen > 768px)
+   Range: 10% to 80% to ensure no cutoff.
+   Items on the right side have row-reverse to grow text inwards.
+   ================================================================= */
 
-  .ml-concept.medium .concept-image-container {
-    width: 80px;
-    height: 80px;
-  }
+/* 1. Far Left */
+.ml-concept:nth-child(11n + 1) { left: 10%; flex-direction: row; }
 
-  .ml-concept.small .concept-image-container {
-    width: 50px;
-    height: 50px;
-  }
-}
+/* 2. Middle Right */
+.ml-concept:nth-child(11n + 2) { left: 60%; flex-direction: row-reverse; text-align: right; }
 
-.concept-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(135, 206, 235, 0.3));
-}
+/* 3. Center Left */
+.ml-concept:nth-child(11n + 3) { left: 30%; flex-direction: row-reverse; text-align: right; }
 
-/* Concept info card */
+/* 4. Far Right (Safe Zone) */
+.ml-concept:nth-child(11n + 4) { left: 75%; flex-direction: row-reverse; text-align: right; }
+
+/* 5. Near Center */
+.ml-concept:nth-child(11n + 5) { left: 48%; flex-direction: row; }
+
+/* 6. Left Edge (Safe Zone) */
+.ml-concept:nth-child(11n + 6) { left: 12%; flex-direction: row; }
+
+/* 7. Center Right */
+.ml-concept:nth-child(11n + 7) { left: 55%; flex-direction: row; }
+
+/* 8. Middle Left */
+.ml-concept:nth-child(11n + 8) { left: 22%; flex-direction: row-reverse; text-align: right; }
+
+/* 9. Near Right */
+.ml-concept:nth-child(11n + 9) { left: 68%; flex-direction: row-reverse; text-align: right; }
+
+/* 10. Left Center */
+.ml-concept:nth-child(11n + 10) { left: 38%; flex-direction: row; }
+
+/* 11. Right Edge (Safe Zone) */
+.ml-concept:nth-child(11n + 11) { left: 78%; flex-direction: row-reverse; text-align: right; }
+
+
+/* --- HOVER CARD --- */
 .concept-info {
   position: absolute;
-  top: 100%;
+  bottom: 150%;
   left: 50%;
   transform: translateX(-50%);
-  margin-top: 15px;
-  position: fixed;
-  padding: 15px 20px;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  width: 300px;
+  background: rgba(10, 25, 41, 0.95);
+  border: 1px solid rgba(135, 206, 235, 0.3);
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  padding: 15px;
   border-radius: 8px;
-  min-width: 250px;
-  max-width: 350px;
   opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 100;
   pointer-events: none;
-  transition: opacity 0.3s ease;
-  z-index: 9999;
+  text-align: left !important;
 }
 
 .ml-concept:hover .concept-info {
   opacity: 1;
-  z-index: 999;
+  visibility: visible;
   pointer-events: auto;
+  bottom: 120%;
+}
+
+.concept-info::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(10, 25, 41, 0.95) transparent transparent transparent;
 }
 
 .concept-info h3 {
@@ -299,95 +267,73 @@ main {
 }
 
 .concept-info p {
-  margin: 0;
+  margin: 0 0 12px 0;
   font-size: 13px;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  color: #e2e8f0;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 8px;
 }
 
 .concept-category {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 3px 8px;
   font-size: 11px;
-  background: rgba(135, 206, 235, 0.2);
+  background: rgba(135, 206, 235, 0.1);
   color: #87ceeb;
+  padding: 2px 6px;
   border-radius: 4px;
+  text-transform: capitalize;
 }
 
-/* Depth indicator - fixed position */
-.depth-indicator {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 15px 25px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 18px;
-  color: #87ceeb;
-  font-weight: bold;
-  z-index: 9999;
+.paper-link {
+  font-size: 12px;
+  color: #fff;
+  background-color: #0284c7;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background-color 0.2s;
 }
 
-/* Zone labels */
-.zone-label {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 32px;
-  font-weight: bold;
-  color: rgba(255, 255, 255, 0.15);
-  text-transform: uppercase;
-  letter-spacing: 4px;
-  pointer-events: none;
-  z-index: 9999;
+.paper-link:hover {
+  background-color: #0ea5e9;
 }
 
-/* Floating animation for concepts */
+/* Floating animation */
 @keyframes float {
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
 }
 
 .ml-concept.visible {
   animation: float 6s ease-in-out infinite;
 }
 
-.ml-concept.visible:nth-child(2n) {
-  animation-delay: 1s;
-  animation-duration: 7s;
+.ml-concept.visible:nth-child(3n) { animation-delay: 1s; }
+.ml-concept.visible:nth-child(3n+1) { animation-delay: 2s; }
+.ml-concept.visible:nth-child(5n) { animation-duration: 7s; }
+
+/* Zone labels */
+.zone-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  pointer-events: none;
+  z-index: 5;
+  text-align: center;
+  width: 100%;
 }
 
-.ml-concept.visible:nth-child(3n) {
-  animation-delay: 2s;
-  animation-duration: 8s;
-}
-
-/* Navigation */
-nav {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem;
-}
-
-nav a {
-  color: inherit;
-  text-decoration: none;
-}
-
-nav a:hover {
-  text-decoration: underline;
-}
-
-/* Title section */
 .title-container {
   display: flex;
   flex-direction: column;
@@ -397,24 +343,104 @@ nav a:hover {
 }
 
 .title-container h1 {
-  font-weight: bold;
-  font-size: 3rem;
+  font-weight: 800;
+  font-size: 3.5rem;
   margin: 0;
+  color: #0f172a;
 }
 
-.title-container h5 {
-  padding: 0.75rem;
+.title-container h2 {
+  font-size: 1.2rem;
   font-weight: 500;
-  margin: 0;
+  color: #334155;
+  margin-top: 10px;
 }
 
+/* =================================================================
+   MOBILE NATURAL POSITIONING (Screen <= 768px)
+   Using a cycle of 7 to create a random scattered look on small screens.
+   Strictly bounded between 10% and 70% to allow text space.
+   Aligning text direction based on side of screen.
+   ================================================================= */
 @media (max-width: 768px) {
-  .title-container h1 {
-    font-size: 2rem;
+  .ocean-container { max-width: 100%; padding: 0 5px; }
+  .zone-label { font-size: 18px; letter-spacing: 2px; }
+  
+  /* Reset Desktop Styles */
+  .ml-concept {
+    width: auto;
+    max-width: 180px;
   }
 
-  .zone-label {
-    font-size: 20px;
-    letter-spacing: 2px;
+  .concept-name-label { font-size: 12px; }
+
+  /* 1. Left (Text grows Right) */
+  .ml-concept:nth-child(7n + 1) { 
+    left: 10%; 
+    flex-direction: row; 
+    text-align: left;
   }
+
+  /* 2. Far Right (Text grows Left) */
+  .ml-concept:nth-child(7n + 2) { 
+    left: auto; 
+    right: 5%; 
+    flex-direction: row-reverse; 
+    text-align: right;
+  }
+
+  /* 3. Center Left */
+  .ml-concept:nth-child(7n + 3) { 
+    left: 25%; 
+    flex-direction: row; 
+    text-align: left;
+  }
+
+  /* 4. Center Right */
+  .ml-concept:nth-child(7n + 4) { 
+    left: auto; 
+    right: 25%; 
+    flex-direction: row-reverse; 
+    text-align: right;
+  }
+
+  /* 5. Near Left */
+  .ml-concept:nth-child(7n + 5) { 
+    left: 15%; 
+    flex-direction: row; 
+    text-align: left;
+  }
+
+  /* 6. Near Right */
+  .ml-concept:nth-child(7n + 6) { 
+    left: auto; 
+    right: 15%; 
+    flex-direction: row-reverse; 
+    text-align: right;
+  }
+
+  /* 7. Center */
+  .ml-concept:nth-child(7n + 7) { 
+    left: 50%; 
+    transform: translateX(-50%) translateY(30px);
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  /* Adjust animation for center items to maintain X centering */
+  .ml-concept.visible:nth-child(7n + 7) { 
+    transform: translateX(-50%) translateY(0);
+    animation-name: float-center-mobile;
+  }
+
+  /* Smaller Hover Card on Mobile */
+  .concept-info {
+    width: 240px;
+    padding: 10px;
+  }
+}
+
+@keyframes float-center-mobile {
+  0%, 100% { transform: translate(-50%, 0px); }
+  50% { transform: translate(-50%, -10px); }
 }
