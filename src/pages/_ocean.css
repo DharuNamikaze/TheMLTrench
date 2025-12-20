@@ -63,7 +63,7 @@ main {
   left: 0;
   width: 100%;
   height: 100px;
-  background-image: url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,40 Q300,10 600,40 T1200,40 L1200,120 L0,120 Z" fill="%2317bdff"/></svg>');
+  background-image: url('data:image/svg+xml, <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,40 Q300,10 600,40 T1200,40 L1200,120 L0,120 Z" fill="%234fc3f7"/></svg>');
   background-repeat: repeat-x;
   background-size: 600px 120px;
   animation: wave-slow 8s linear infinite;
