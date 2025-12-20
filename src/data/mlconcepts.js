@@ -87,6 +87,42 @@ export const mlConcepts = [
     link: 'https://www.geeksforgeeks.org/machine-learning/ml-one-hot-encoding/'
   },
   {
+    id: 'supervised',
+    name: 'Supervised Learning',
+    depth: 1600,
+    description: 'Learning mapping from labeled data',
+    category: 'paradigm',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Supervised_learning'
+  },
+  {
+    id: 'unsupervised',
+    name: 'Unsupervised Learning',
+    depth: 1700,
+    description: 'Finding patterns in unlabeled data',
+    category: 'paradigm',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Unsupervised_learning'
+  },
+  {
+    id: 'ffnn',
+    name: 'Feed Forward Neural Networks',
+    depth: 4700,
+    description: 'Type of NN in which information flows in a single direction, where inputs are multiplied by weights to obtain outputs',
+    category: 'architecture',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Feedforward_neural_network'
+  },
+  {
+    id: 'cnn',
+    name: 'Convolutional Neural Networks',
+    depth: 4800,
+    description: 'Type of NN processes images by grids allowing spatial understanding',
+    category: 'architecture',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Convolutional_neural_network'
+  },
+  {
     id: 'activation-funcs',
     name: 'Activation Functions',
     depth: 1000,
@@ -94,6 +130,24 @@ export const mlConcepts = [
     category: 'fundamentals',
     size: 'medium',
     link: 'https://en.wikipedia.org/wiki/Activation_function'
+  },
+  {
+    id: 'n-gram',
+    name: 'N-gram Models',
+    depth: 5100,
+    description: 'statistical language model that predicts the probability of a word (or symbol) based on the preceding n-1 words',
+    category: 'nlp',
+    size: 'medium',
+    link: 'https://web.stanford.edu/~jurafsky/slp3/3.pdf'
+  },
+  {
+    id: 'rnn',
+    name: 'Recurrent Neural Networks',
+    depth: 5350,
+    description: 'Processing sequential data with internal state',
+    category: 'architecture',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Recurrent_neural_network'
   },
   {
     id: 'optimizers',
@@ -139,24 +193,6 @@ export const mlConcepts = [
     category: 'preprocessing',
     size: 'medium',
     link: 'https://www.geeksforgeeks.org/machine-learning/handling-imbalanced-data-for-classification/'
-  },
-  {
-    id: 'supervised',
-    name: 'Supervised Learning',
-    depth: 1600,
-    description: 'Learning mapping from labeled data',
-    category: 'paradigm',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Supervised_learning'
-  },
-  {
-    id: 'unsupervised',
-    name: 'Unsupervised Learning',
-    depth: 1700,
-    description: 'Finding patterns in unlabeled data',
-    category: 'paradigm',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Unsupervised_learning'
   },
   {
     id: 'forward-noising',
@@ -385,24 +421,6 @@ export const mlConcepts = [
     link: 'https://arxiv.org/pdf/1805.01053'
   },
   {
-    id: 'ffnn',
-    name: 'Feed Forward Neural Networks',
-    depth: 4700,
-    description: 'Type of NN in which information flows in a single direction, where inputs are multiplied by weights to obtain outputs',
-    category: 'architecture',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Feedforward_neural_network'
-  },
-  {
-    id: 'cnn',
-    name: 'Convolutional Neural Networks',
-    depth: 4800,
-    description: 'Type of NN processes images by grids allowing spatial understanding',
-    category: 'architecture',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Convolutional_neural_network'
-  },
-  {
     id: 'mem-gen-paradox',
     name: 'Memorization–Generalization Paradox',
     depth: 4950,
@@ -411,33 +429,7 @@ export const mlConcepts = [
     size: 'medium',
     link: 'https://proceedings.mlr.press/v70/arpit17a/arpit17a.pdf'
   },
-  {
-    id: 'n-gram',
-    name: 'N-gram Models',
-    depth: 5100,
-    description: 'statistical language model that predicts the probability of a word (or symbol) based on the preceding n-1 words',
-    category: 'nlp',
-    size: 'medium',
-    link: 'https://web.stanford.edu/~jurafsky/slp3/3.pdf'
-  },
-  {
-    id: 'lstm-gru',
-    name: 'LSTM & GRU Gating Mechanism',
-    depth: 5200,
-    description: 'Controlling information flow in sequences',
-    category: 'architecture',
-    size: 'medium',
-    link: 'https://www.geeksforgeeks.org/deep-learning/rnn-vs-lstm-vs-gru-vs-transformers/'
-  },
-  {
-    id: 'rnn',
-    name: 'Recurrent Neural Networks',
-    depth: 5350,
-    description: 'Processing sequential data with internal state',
-    category: 'architecture',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Recurrent_neural_network'
-  },
+
   {
     id: 'latent-scaling',
     name: 'Latent Space Scaling',
@@ -446,15 +438,6 @@ export const mlConcepts = [
     category: 'training',
     size: 'medium',
     link: 'https://arxiv.org/pdf/2507.16154'
-  },
-  {
-    id: 'dnn',
-    name: 'Deep Neural Networks',
-    depth: 5650,
-    description: 'Stacked layers for hierarchical feature learning',
-    category: 'architecture',
-    size: 'medium',
-    link: 'https://www.geeksforgeeks.org/deep-learning/introduction-deep-learning/'
   },
   {
     id: 'high-dim-generalization',
@@ -487,15 +470,6 @@ export const mlConcepts = [
     category: 'attention',
     size: 'medium',
     link: 'https://arxiv.org/pdf/2407.18601'
-  },
-  {
-    id: 'llm',
-    name: 'Large Language Models',
-    depth: 6400,
-    description: 'Scaled up transformers on massive corpus',
-    category: 'nlp',
-    size: 'medium',
-    link: 'https://en.wikipedia.org/wiki/Large_language_model'
   },
   {
     id: 'self-attention',
@@ -559,6 +533,15 @@ export const mlConcepts = [
     category: 'attention',
     size: 'medium',
     link: 'https://www.csie.ntu.edu.tw/~yvchen/doc/EMNLP20_PositionVec.pdf'
+  },
+  {
+    id: 'llm',
+    name: 'Large Language Models',
+    depth: 6400,
+    description: 'Scaled up transformers on massive corpus',
+    category: 'nlp',
+    size: 'medium',
+    link: 'https://en.wikipedia.org/wiki/Large_language_model'
   },
   {
     id: 'transformer-expressivity',
