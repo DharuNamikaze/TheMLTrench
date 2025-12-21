@@ -1,29 +1,47 @@
 ---
-import Analytics from '@vercel/analytics/astro';
-const pageDescription = "Learn how to build accessible, SEO-friendly websites with Astro, focusing on meta descriptions and user experience.";
+import Analytics from "@vercel/analytics/astro";
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="generator" content={Astro.generator} />
-		<title>The ML Trench</title>
-		<meta name="description" content={pageDescription}>
-	</head>
-	<body>
-		<slot />
-		<Analytics/>
-	</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="title" content="The ML Trench" />
+    <meta property="og:title" content="The ML Trench" />
+    <title>The ML Trench</title>
+    <meta property="og:site_name" content="The ML Trench" />
+    <meta
+      name="description"
+      content="Visualize the depth of machine learning concepts"
+    />
+    <meta
+      property="og:description"
+      content="Visualize the depth of machine learning concepts"
+    />
+    <meta property="og:url" content="https://deep-ml-trench.vercel.app" />
+    <script is:inline type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "The ML Trench",
+        "url": "https://deep-ml-trench.vercel.app"
+      }
+    </script>
+  </head>
+  <body>
+    <slot />
+    <Analytics />
+  </body>
 </html>
 
 <style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+  }
 </style>
