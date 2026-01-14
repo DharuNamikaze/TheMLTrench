@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Trench Test</title>
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      font-family: sans-serif;
+    }
+    
+    #info {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      z-index: 10;
+      max-width: 500px;
+      text-align: center;
+    }
+    
+    #info h2 { margin: 0 0 10px 0; color: #87CEEB; }
+    #info p { margin: 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <!-- Static info card -->
+  <div id="info">
+    <h2 id="concept-name">Welcome to ML Trench</h2>
+    <p id="concept-desc">Fly through space to explore concepts</p>
+    <p style="margin-top: 10px; font-size: 12px; color: #87CEEB;">
+      Mouse to look | WASD to move | Click dots to fly to them
+    </p>
+  </div>
+
+  <!-- Three.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <script>
+    // 🎯 STEP 1: Setup Scene, Camera, Renderer
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000428); // Deep ocean blue
+    
+    const camera = new THREE.PerspectiveCamera(
+      75,                                    // Field of view
+      window.innerWidth / window.innerHeight, // Aspect ratio
+      0.1,                                   // Near plane
+      5000                                   // Far plane (can see 5000 units away)
+    );
+    camera.position.set(0, 0, 100); // Start 100 units "above" the scene
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    
+    // 🌫️ STEP 2: Add Fog
+    scene.fog = new THREE.Fog(0x000000, 100, 400); // Same color as background
+    
+    // ✨ STEP 3: Create a test concept (glowing sphere)
+    const geometry = new THREE.SphereGeometry(150, 16, 16); // Radius 5, moderate detail
+    const material = new THREE.MeshBasicMaterial({ 
+      color: 0x87CEEB,  // Sky blue
+      transparent: true,
+      opacity: 0.9
+    });
+    const testSphere = new THREE.Mesh(geometry, material);
+    testSphere.position.set(0, 0, -200); // 200 units "down" the trench
+    scene.add(testSphere);
+    
+    // Add glow effect (point light)
+    const light = new THREE.PointLight(0x23AEEE, 24, 500);
+    light.position.copy(testSphere.position);
+    scene.add(light);
+    
+    // 🎬 STEP 4: Animation Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Make sphere pulse (grow and shrink)
+      const scale = 1 + Math.sin(Date.now() * 0.0002) * 0.5;
+      const leftscale = 1 + Math.sin(Date.now() * 0.008) * 0.105;
+      testSphere.scale.set(scale, leftscale, scale);
+      
+      renderer.render(scene, camera);
+    }
+    
+    animate(); // START!
+    
+    // 📱 STEP 5: Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
