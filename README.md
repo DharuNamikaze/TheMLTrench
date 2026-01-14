@@ -1,37 +1,46 @@
-# Deep-ML-Trench - Machine Learning Under the Iceberg.
+# Astro Starter Kit: Basics
 
-Exploration of machine learning concepts organized by depth and complexity. we present ML topics from basic fundamentals to state-of-the-art research in an ocean-depth metaphor.
+```sh
+npm create astro@latest -- --template basics
+```
 
-## What is this?
+> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
 
-Deep-ML-Trench is a information site that displays machine learning concepts arranged by their complexity level, from surface-level fundamentals (0-2000m) down to deep theoretical research (14000m+). Each concept includes a brief description and links to learn more.
+## 🚀 Project Structure
 
-The site covers topics like:
-- **Base Level**: Regression, clustering, neural networks
-- **Deep Levels**: Transformers, attention mechanisms, scaling laws
-- **The Void**: Advanced theory, topological deep learning, frontier research
+Inside of your Astro project, you'll see the following folders and files:
 
-## How to Run
+```text
+/
+├── public/
+│   └── favicon.svg
+├── src
+│   ├── assets
+│   │   └── astro.svg
+│   ├── components
+│   │   └── Welcome.astro
+│   ├── layouts
+│   │   └── Layout.astro
+│   └── pages
+│       └── index.astro
+└── package.json
+```
 
-1. **Install Node.js** - Download from [nodejs.org](https://nodejs.org)
+To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
 
-2. **Open terminal/command prompt** and navigate to the project folder
+## 🧞 Commands
 
-3. **Install dependencies**:
-   ```
-   npm install
-   ```
+All commands are run from the root of the project, from a terminal:
 
-4. **Start the development server**:
-   ```
-   npm run dev
-   ```
+| Command                   | Action                                           |
+| :------------------------ | :----------------------------------------------- |
+| `npm install`             | Installs dependencies                            |
+| `npm run dev`             | Starts local dev server at `localhost:4321`      |
+| `npm run build`           | Build your production site to `./dist/`          |
+| `npm run preview`         | Preview your build locally, before deploying     |
+| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
+| `npm run astro -- --help` | Get help using the Astro CLI                     |
 
-5. **Open your browser** and go to `http://localhost:4321`
+## 👀 Want to learn more?
 
-That's it! The site will automatically reload when you make changes.
-
-## Other Commands
-
-- `npm run build` - Build for production
-- `npm run preview` - Preview the built site
+Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).

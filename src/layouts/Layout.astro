@@ -1,54 +1,22 @@
----
-import Analytics from "@vercel/analytics/astro";
-import SpeedInsights from "@vercel/speed-insights/astro";
----
-
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="generator" content={Astro.generator} />
-    <meta name="title" content="The ML Trench" />
-    <meta property="og:title" content="The ML Trench" />
-    <title>The ML Trench</title>
-    <meta property="og:site_name" content="The ML Trench" />
-    <meta
-      name="description"
-      content="Visualize the depth of machine learning concepts"
-    />
-    <meta
-      property="og:description"
-      content="Visualize the depth of machine learning concepts"
-    />
-    <meta property="og:url" content="https://deep-ml-trench.vercel.app" />
-    <script is:inline type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "The ML Trench",
-        "url": "https://deep-ml-trench.vercel.app"
-      }
-    </script>
-    <script
-      defer
-      is:inline
-      src="https://cloud.umami.is/script.js"
-      data-website-id="3109dfdd-45ab-449c-9408-44cca79eb9b1"></script>
-  </head>
-  <body>
-    <slot />
-    <SpeedInsights />
-    <Analytics />
-  </body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>Astro Basics</title>
+	</head>
+	<body>
+		<slot />
+	</body>
 </html>
 
 <style>
-  html,
-  body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-  }
+	html,
+	body {
+		margin: 0;
+		width: 100%;
+		height: 100%;
+	}
 </style>
