@@ -2,11 +2,44 @@
   import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
   // ===============================
+  // 0️⃣ CROSSHAIR SETUP
+  // ===============================
+  const crosshair = document.createElement('div');
+  crosshair.id = 'crosshair';
+  crosshair.style.cssText = `
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    border: 2px solid rgba(135, 206, 235, 0.8);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1000;
+    transition: border-color 0.2s;
+  `;
+  
+  const crosshairDot = document.createElement('div');
+  crosshairDot.style.cssText = `
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    background: rgba(135, 206, 235, 0.8);
+    border-radius: 50%;
+  `;
+  crosshair.appendChild(crosshairDot);
+  document.body.appendChild(crosshair);
+
+  // ===============================
   // 1️⃣ SCENE SETUP
   // ===============================
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000428);
-  scene.fog = new THREE.Fog(0x000000, 100, 1200);
+  scene.fog = new THREE.Fog(0x000428, 200, 1500);
 
   const camera = new THREE.PerspectiveCamera(
     75,
@@ -21,41 +54,106 @@
   document.body.appendChild(renderer.domElement);
 
   // ===============================
-  // 2️⃣ LIGHT
+  // 2️⃣ DEPTH ZONES WITH COLORS
   // ===============================
-  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-  const light = new THREE.PointLight(0x23aeee, 2, 3000);
-  scene.add(light);
+  const depthZones = [
+    { 
+      name: "Surface", 
+      depthRange: [0, 2000], 
+      color: 0x4fc3f7,
+      count: 100 
+    },
+    { 
+      name: "Twilight", 
+      depthRange: [2000, 6000], 
+      color: 0x0288d1,
+      count: 150 
+    },
+    { 
+      name: "Midnight", 
+      depthRange: [6000, 10000], 
+      color: 0x1a237e,
+      count: 150 
+    },
+    { 
+      name: "Abyss", 
+      depthRange: [10000, 14000], 
+      color: 0x311b92,
+      count: 100 
+    },
+    { 
+      name: "The Void", 
+      depthRange: [14000, 18000], 
+      color: 0xff00ff,
+      count: 100 
+    },
+  ];
 
   // ===============================
-  // 3️⃣ CREATE SPHERES
+  // 3️⃣ CREATE GLOWING SPHERES (FIXED!)
   // ===============================
-  const geometry = new THREE.SphereGeometry(15, 16, 16);
   const spheres = [];
+  const geometry = new THREE.SphereGeometry(8, 16, 16); // Reduced segments for performance
 
-  for (let i = 0; i < 100; i++) {
-    const sphere = new THREE.Mesh(
-      geometry,
-      new THREE.MeshBasicMaterial({ color: 0x87ceeb }),
-    );
+  // 🔥 KEY FIX: Use MeshBasicMaterial instead of MeshStandardMaterial
+  // MeshStandardMaterial needs proper lighting setup and causes shader errors with too many lights
+  
+  depthZones.forEach((zone) => {
+    for (let i = 0; i < zone.count; i++) {
+      // ✅ FIXED: MeshBasicMaterial doesn't need lights and won't cause shader errors
+      const material = new THREE.MeshBasicMaterial({
+        color: zone.color,
+        transparent: true,
+        opacity: 0.85,
+      });
 
-    sphere.position.set(
-      Math.random() * 2400 - 600,
-      Math.random() * 1200 - 600,
-      Math.random() * 2400 - 600,
-    );
+      const sphere = new THREE.Mesh(geometry, material);
 
-    sphere.userData = {
-      title: `Concept ${i + 1}`,
-      description: `Explore concept ${i + 1}`,
-    };
+      // 📍 POSITION BY DEPTH ZONE
+      const [minDepth, maxDepth] = zone.depthRange;
+      const depth = (Math.random() - 0.5) * 3500;
 
-    scene.add(sphere);
-    spheres.push(sphere);
-  }
+      sphere.position.set(
+        (Math.random() - 0.5) * 3500,  // X: -400 to 400
+        (Math.random() - 0.5) * 3500,  // Y: -200 to 200
+        depth                         // Z: Negative = going down
+      );
+
+      // 💾 METADATA
+      sphere.userData = {
+        title: `${zone.name} Concept ${i + 1}`,
+        description: `A concept at ${Math.round(depth)}m depth`,
+        zone: zone.name,
+        depth: depth,
+        originalColor: zone.color // Store for hover reset
+      };
+
+      scene.add(sphere);
+      spheres.push(sphere);
+    }
+  });
+
+  console.log(`✅ Created ${spheres.length} spheres in ${depthZones.length} zones`);
 
   // ===============================
-  // 4️⃣ POINTER LOCK (MOUSE LOOK)
+  // 4️⃣ OPTIMIZED LIGHTING
+  // ===============================
+  // ✅ FIXED: Instead of 600 PointLights (causes shader error), 
+  // use just ambient light with emissive materials
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+  scene.add(ambientLight);
+
+  // Add a few strategic lights for atmosphere (not per sphere!)
+  const topLight = new THREE.DirectionalLight(0x4fc3f7, 0.5);
+  topLight.position.set(0, 500, 0);
+  scene.add(topLight);
+
+  const bottomLight = new THREE.DirectionalLight(0xff00ff, 0.3);
+  bottomLight.position.set(0, -500, -15000);
+  scene.add(bottomLight);
+
+  // ===============================
+  // 5️⃣ POINTER LOCK (MOUSE LOOK)
   // ===============================
   const yaw = new THREE.Object3D();
   const pitch = new THREE.Object3D();
@@ -80,7 +178,7 @@
     yaw.rotation.y -= e.movementX * 0.002;
     pitch.rotation.x -= e.movementY * 0.002;
 
-    // Prevent flipping
+    // Prevent camera flipping
     pitch.rotation.x = Math.max(
       -Math.PI / 2,
       Math.min(Math.PI / 2, pitch.rotation.x),
@@ -88,10 +186,10 @@
   });
 
   // ===============================
-  // 5️⃣ KEYBOARD MOVEMENT
+  // 6️⃣ KEYBOARD MOVEMENT
   // ===============================
   const keys = {};
-  let speed = 5;
+  let speed = 8;
   let isBoosting = false;
 
   window.addEventListener("keydown", (e) => {
@@ -119,60 +217,126 @@
     if (keys["KeyS"]) move.sub(forward);
     if (keys["KeyA"]) move.add(left);
     if (keys["KeyD"]) move.add(right);
+    if (keys["Space"]) yaw.position.y += speed * 0.5; // Up
+    if (keys["ControlLeft"]) yaw.position.y -= speed * 0.5; // Down
 
     move.normalize();
 
-    const currentSpeed = isBoosting ? speed*speed: speed;
+    const currentSpeed = isBoosting ? speed * 2 : speed;
     yaw.position.addScaledVector(move, currentSpeed);
   }
 
   // ===============================
-  // 6️⃣ RAYCAST INTERACTION
+  // 7️⃣ RAYCAST INTERACTION (FIXED!)
   // ===============================
   const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
+  raycaster.far = 500;
   let hovered = null;
+  let halo = null;
 
-  window.addEventListener("mousemove", (e) => {
-    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  });
+  const centerMouse = new THREE.Vector2(0, 0);
+  
+  // Create halo geometry (ring)
+  const haloGeometry = new THREE.RingGeometry(18, 25, 32);
 
   function handleHover() {
-    raycaster.setFromCamera(mouse, camera);
+    raycaster.setFromCamera(centerMouse, camera);
     const hits = raycaster.intersectObjects(spheres);
 
+    // Reset previous hover
     if (hovered) {
-      hovered.material.color.set(0x87ceeb);
+      hovered.material.color.setHex(hovered.userData.originalColor);
+      hovered.material.opacity = 0.85;
       hovered.scale.set(1, 1, 1);
       hovered = null;
+      
+      // Remove halo
+      if (halo) {
+        scene.remove(halo);
+        halo = null;
+      }
     }
 
+    // Apply new hover
     if (hits.length > 0) {
       hovered = hits[0].object;
-      hovered.material.color.set(0xff4444);
-      hovered.scale.set(1.4, 1.4, 1.4);
+
+      // ✅ FIXED: Use color instead of emissive (MeshBasicMaterial doesn't have emissive)
+      hovered.material.color.set(0xffffff);
+      hovered.material.opacity = 1.0;
+      hovered.scale.set(1.3, 1.3, 1.3);
+
+      crosshair.style.borderColor = 'rgba(255, 255, 255, 1)';
+      crosshairDot.style.background = 'rgba(255, 255, 255, 1)';
+      
+      // Create halo above sphere
+      const haloMaterial = new THREE.MeshBasicMaterial({
+        color: hovered.userData.originalColor,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6,
+      });
+      
+      halo = new THREE.Mesh(haloGeometry, haloMaterial);
+      halo.position.copy(hovered.position);
+      halo.position.y += 1; // Position above sphere
+      halo.lookAt(camera.position); // Face camera
+      scene.add(halo);
+      
+      console.log(`Hovering: ${hovered.userData.title}`);
+    } else {
+      crosshair.style.borderColor = 'rgba(135, 206, 235, 0.8)';
+      crosshairDot.style.background = 'rgba(135, 206, 235, 0.8)';
     }
   }
 
   // ===============================
-  // 7️⃣ ANIMATION LOOP
+  // 8️⃣ SPHERE PULSE ANIMATION
+  // ===============================
+  function animateSpheres() {
+    const time = Date.now() * 0.001;
+
+    spheres.forEach((sphere, i) => {
+      // Skip animation for hovered sphere
+      if (hovered === sphere) return;
+
+      // Subtle pulse
+      const pulse = 1 + Math.sin(time * 2 + i * 0.1) * 0.05;
+      sphere.scale.set(pulse, pulse, pulse);
+
+      // Gentle rotation
+      sphere.rotation.y += 0.005;
+    });
+  }
+
+  // ===============================
+  // 9️⃣ ANIMATION LOOP
   // ===============================
   function animate() {
     requestAnimationFrame(animate);
     movePlayer();
     handleHover();
+    animateSpheres();
     renderer.render(scene, camera);
   }
 
   animate();
 
   // ===============================
-  // 8️⃣ RESIZE
+  // 🔟 RESIZE HANDLER
   // ===============================
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ===============================
+  // 🎯 ESC TO EXIT POINTER LOCK
+  // ===============================
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Escape") {
+      document.exitPointerLock();
+    }
   });
 </script>
