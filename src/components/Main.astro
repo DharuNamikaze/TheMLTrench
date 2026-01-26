@@ -99,18 +99,23 @@
   const glowSprites = [];
   const geometry = new THREE.SphereGeometry(8, 16, 16);
 
-  // Create glow texture for sprites
+  // Create glow texture for sprites (enhanced neon glow)
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d');
-  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  
+  // Create intense neon glow with multiple layers
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
   gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
-  gradient.addColorStop(0.4, 'rgba(255, 255, 255, 0.4)');
+  gradient.addColorStop(0.1, 'rgba(255, 255, 255, 0.9)');
+  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.7)');
+  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.5)');
+  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
+  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)');
   gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillRect(0, 0, 256, 256);
   const glowTexture = new THREE.CanvasTexture(canvas);
 
   // Create 10 clusters of 100 spheres each
@@ -124,19 +129,31 @@
       (Math.random() - 0.5) * 2000
     );
 
+    // Add subtle cluster glow at center
+    const clusterGlowMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: clusterColor,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.15, // Subtle cluster glow
+    });
+    const clusterGlow = new THREE.Sprite(clusterGlowMaterial);
+    clusterGlow.scale.set(600, 600, 1); // Medium glow for cluster
+    clusterGlow.position.copy(clusterCenter);
+    scene.add(clusterGlow);
+
     for (let i = 0; i < 100; i++) {
       // Create sphere
       const material = new THREE.MeshBasicMaterial({
         color: clusterColor,
         transparent: true,
         opacity: 0.9,
-        size:50,
       });
 
       const sphere = new THREE.Mesh(geometry, material);
 
       // Position within cluster (spherical distribution around cluster center)
-      const radius = Math.random() * 500 + 50; // 50-350 units from center
+      const radius = Math.random() * 500 + 50; // 50-550 units from center
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
 
@@ -146,16 +163,16 @@
         clusterCenter.z + radius * Math.cos(phi)
       );
 
-      // Add glow sprite
+      // Add individual sphere glow (subtle)
       const spriteMaterial = new THREE.SpriteMaterial({
         map: glowTexture,
         color: clusterColor,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        opacity: 0.6,
+        opacity: 0.5, // Reduced opacity
       });
       const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(40, 40, 1);
+      sprite.scale.set(50, 50, 1); // Moderate sphere glow
       sprite.position.copy(sphere.position);
       scene.add(sprite);
       glowSprites.push(sprite);
@@ -226,7 +243,7 @@
   // 6️⃣ KEYBOARD MOVEMENT
   // ===============================
   const keys = {};
-  let speed = 16;
+  let speed = 25;
   let isBoosting = false;
 
   window.addEventListener("keydown", (e) => {
