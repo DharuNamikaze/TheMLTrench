@@ -209,9 +209,10 @@
     // Clamp vertical rotation to prevent flipping
     rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
     
-    // Apply directly to camera
-    camera.rotation.x = rotationX;
+    // Apply rotation using proper Euler order to prevent gimbal lock
+    camera.rotation.order = 'YXZ';
     camera.rotation.y = rotationY;
+    camera.rotation.x = rotationX;
   });
 
   // ESC to exit pointer lock
@@ -251,8 +252,6 @@
     if (keys["KeyS"]) move.sub(forward);
     if (keys["KeyD"]) move.add(right);
     if (keys["KeyA"]) move.sub(right);
-    if (keys["Space"]) move.y += 1; // Up
-    if (keys["ControlLeft"]) move.y -= 1; // Down
 
     move.normalize();
 
