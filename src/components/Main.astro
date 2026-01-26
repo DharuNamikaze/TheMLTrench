@@ -183,17 +183,13 @@
   scene.add(ambientLight);
 
   // ===============================
-  // 5️⃣ POINTER LOCK (MOUSE LOOK)
+  // 5️⃣ FREE-LOOK CAMERA WITH POINTER LOCK (NO SMOOTHING)
   // ===============================
-  const yaw = new THREE.Object3D();
-  const pitch = new THREE.Object3D();
-
-  yaw.add(pitch);
-  pitch.add(camera);
-  scene.add(yaw);
-
+  let rotationX = 0;
+  let rotationY = 0;
   let isLocked = false;
 
+  // Click to lock pointer
   document.body.addEventListener("click", () => {
     document.body.requestPointerLock();
   });
@@ -202,17 +198,27 @@
     isLocked = document.pointerLockElement === document.body;
   });
 
+  // Mouse move for free look (instant, no smoothing)
   document.addEventListener("mousemove", (e) => {
     if (!isLocked) return;
+    
+    // Direct rotation control (no smoothing)
+    rotationY -= e.movementX * 0.002;
+    rotationX -= e.movementY * 0.002;
+    
+    // Clamp vertical rotation to prevent flipping
+    rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
+    
+    // Apply directly to camera
+    camera.rotation.x = rotationX;
+    camera.rotation.y = rotationY;
+  });
 
-    yaw.rotation.y -= e.movementX * 0.002;
-    pitch.rotation.x -= e.movementY * 0.002;
-
-    // Prevent camera flipping
-    pitch.rotation.x = Math.max(
-      -Math.PI / 2,
-      Math.min(Math.PI / 2, pitch.rotation.x),
-    );
+  // ESC to exit pointer lock
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Escape") {
+      document.exitPointerLock();
+    }
   });
 
   // ===============================
@@ -234,24 +240,24 @@
 
   function movePlayer() {
     const move = new THREE.Vector3();
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-
-    const right = new THREE.Vector3();
-    right.crossVectors(forward, camera.up).normalize();
-
-    const left = new THREE.Vector3();
-    left.crossVectors(camera.up, forward).normalize();
+    const forward = new THREE.Vector3(0, 0, -1);
+    const right = new THREE.Vector3(1, 0, 0);
+    
+    // Apply camera rotation to movement vectors
+    forward.applyQuaternion(camera.quaternion);
+    right.applyQuaternion(camera.quaternion);
 
     if (keys["KeyW"]) move.add(forward);
     if (keys["KeyS"]) move.sub(forward);
-    if (keys["KeyA"]) move.add(left);
     if (keys["KeyD"]) move.add(right);
+    if (keys["KeyA"]) move.sub(right);
+    if (keys["Space"]) move.y += 1; // Up
+    if (keys["ControlLeft"]) move.y -= 1; // Down
 
     move.normalize();
 
     const currentSpeed = isBoosting ? speed * 2 : speed;
-    yaw.position.addScaledVector(move, currentSpeed);
+    camera.position.addScaledVector(move, currentSpeed);
   }
 
   // ===============================
@@ -366,14 +372,5 @@
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  // ===============================
-  // 🎯 ESC TO EXIT POINTER LOCK
-  // ===============================
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Escape") {
-      document.exitPointerLock();
-    }
   });
 </script>
