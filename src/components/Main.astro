@@ -93,11 +93,13 @@
   ];
 
   // ===============================
-  // 3️⃣ CREATE GLOWING SPHERES WITH CLUSTERS
+  // 3️⃣ CREATE GLOWING SPHERES WITH CLUSTERS (LAZY LOADING)
   // ===============================
   const spheres = [];
   const glowSprites = [];
+  const clusterData = []; // Store cluster metadata for lazy loading
   const geometry = new THREE.SphereGeometry(8, 16, 16);
+  const RENDER_DISTANCE = 2500; // Distance threshold for rendering
 
   // Create glow texture for sprites (enhanced neon glow)
   const canvas = document.createElement('canvas');
@@ -118,80 +120,158 @@
   ctx.fillRect(0, 0, 256, 256);
   const glowTexture = new THREE.CanvasTexture(canvas);
 
-  // Create 10 clusters of 100 spheres each
+  // Generate cluster metadata (don't create objects yet)
   for (let clusterIndex = 0; clusterIndex < 10; clusterIndex++) {
     const clusterColor = clusterColors[clusterIndex];
     
     // Random cluster center in free space (increased distance between clusters)
     const clusterCenter = new THREE.Vector3(
-      (Math.random() - 0.5) * 4000, // Increased from 2000
-      (Math.random() - 0.5) * 4000,
-      (Math.random() - 0.5) * 4000
+      (Math.random() - 0.5) * 7000,
+      (Math.random() - 0.5) * 7000,
+      (Math.random() - 0.5) * 7000
     );
 
-    // Add subtle cluster glow at center
-    const clusterGlowMaterial = new THREE.SpriteMaterial({
-      map: glowTexture,
+    const cluster = {
+      index: clusterIndex,
       color: clusterColor,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      opacity: 0.15, // Subtle cluster glow
-    });
-    const clusterGlow = new THREE.Sprite(clusterGlowMaterial);
-    clusterGlow.scale.set(600, 600, 1); // Medium glow for cluster
-    clusterGlow.position.copy(clusterCenter);
-    scene.add(clusterGlow);
+      center: clusterCenter,
+      spheres: [],
+      glowSprite: null,
+      loaded: false
+    };
 
+    // Generate sphere positions (but don't create meshes yet)
     for (let i = 0; i < 100; i++) {
-      // Create sphere
-      const material = new THREE.MeshBasicMaterial({
-        color: clusterColor,
-        transparent: true,
-        opacity: 0.9,
-      });
-
-      const sphere = new THREE.Mesh(geometry, material);
-
-      // Position within cluster (increased spacing between dots)
-      const radius = Math.random() * 800 + 100; // Increased from 500+50 to 800+100
+      const radius = Math.random() * 800 + 100;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
 
-      sphere.position.set(
+      const position = new THREE.Vector3(
         clusterCenter.x + radius * Math.sin(phi) * Math.cos(theta),
         clusterCenter.y + radius * Math.sin(phi) * Math.sin(theta),
         clusterCenter.z + radius * Math.cos(phi)
       );
 
-      // Add individual sphere glow (subtle)
+      cluster.spheres.push({
+        position: position,
+        title: `Cluster ${clusterIndex + 1} - Concept ${i + 1}`,
+        description: `A concept in cluster ${clusterIndex + 1}`,
+        mesh: null,
+        sprite: null
+      });
+    }
+
+    clusterData.push(cluster);
+  }
+
+  console.log(`✅ Generated ${clusterData.length} clusters with metadata`);
+
+  // Function to load a cluster
+  function loadCluster(cluster) {
+    if (cluster.loaded) return;
+
+    // Create cluster glow
+    const clusterGlowMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: cluster.color,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      opacity: 0.15,
+    });
+    cluster.glowSprite = new THREE.Sprite(clusterGlowMaterial);
+    cluster.glowSprite.scale.set(600, 600, 1);
+    cluster.glowSprite.position.copy(cluster.center);
+    scene.add(cluster.glowSprite);
+
+    // Create spheres
+    cluster.spheres.forEach(sphereData => {
+      const material = new THREE.MeshBasicMaterial({
+        color: cluster.color,
+        transparent: true,
+        opacity: 0.9,
+      });
+
+      const sphere = new THREE.Mesh(geometry, material);
+      sphere.position.copy(sphereData.position);
+
+      // Add glow sprite
       const spriteMaterial = new THREE.SpriteMaterial({
         map: glowTexture,
-        color: clusterColor,
+        color: cluster.color,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        opacity: 0.5, // Reduced opacity
+        opacity: 0.5,
       });
       const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(50, 50, 1); // Moderate sphere glow
-      sprite.position.copy(sphere.position);
+      sprite.scale.set(50, 50, 1);
+      sprite.position.copy(sphereData.position);
       scene.add(sprite);
       glowSprites.push(sprite);
 
-      // Metadata
       sphere.userData = {
-        title: `Cluster ${clusterIndex + 1} - Concept ${i + 1}`,
-        description: `A concept in cluster ${clusterIndex + 1}`,
-        cluster: clusterIndex,
-        originalColor: clusterColor,
+        title: sphereData.title,
+        description: sphereData.description,
+        cluster: cluster.index,
+        originalColor: cluster.color,
         glowSprite: sprite
       };
 
       scene.add(sphere);
       spheres.push(sphere);
-    }
+
+      sphereData.mesh = sphere;
+      sphereData.sprite = sprite;
+    });
+
+    cluster.loaded = true;
+    console.log(`Loaded cluster ${cluster.index + 1}`);
   }
 
-  console.log(`✅ Created ${spheres.length} spheres in 10 clusters`);
+  // Function to unload a cluster
+  function unloadCluster(cluster) {
+    if (!cluster.loaded) return;
+
+    // Remove cluster glow
+    if (cluster.glowSprite) {
+      scene.remove(cluster.glowSprite);
+      cluster.glowSprite = null;
+    }
+
+    // Remove spheres
+    cluster.spheres.forEach(sphereData => {
+      if (sphereData.mesh) {
+        scene.remove(sphereData.mesh);
+        const index = spheres.indexOf(sphereData.mesh);
+        if (index > -1) spheres.splice(index, 1);
+        sphereData.mesh = null;
+      }
+      if (sphereData.sprite) {
+        scene.remove(sphereData.sprite);
+        const spriteIndex = glowSprites.indexOf(sphereData.sprite);
+        if (spriteIndex > -1) glowSprites.splice(spriteIndex, 1);
+        sphereData.sprite = null;
+      }
+    });
+
+    cluster.loaded = false;
+    console.log(`Unloaded cluster ${cluster.index + 1}`);
+  }
+
+  // Function to update cluster loading based on camera distance
+  function updateClusterLoading() {
+    clusterData.forEach(cluster => {
+      const distance = camera.position.distanceTo(cluster.center);
+      
+      if (distance < RENDER_DISTANCE && !cluster.loaded) {
+        loadCluster(cluster);
+      } else if (distance >= RENDER_DISTANCE && cluster.loaded) {
+        unloadCluster(cluster);
+      }
+    });
+  }
+
+  // Initial load of nearby clusters
+  updateClusterLoading();
 
   // ===============================
   // 4️⃣ MINIMAL LIGHTING
@@ -374,6 +454,7 @@
   function animate() {
     requestAnimationFrame(animate);
     movePlayer();
+    updateClusterLoading(); // Check distance and load/unload clusters
     handleHover();
     animateSpheres();
     renderer.render(scene, camera);
