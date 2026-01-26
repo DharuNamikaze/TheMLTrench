@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "gravity": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["gravity-core"]
+    }
+  }
+}

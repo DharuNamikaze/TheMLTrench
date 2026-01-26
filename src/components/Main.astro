@@ -38,8 +38,8 @@
   // 1️⃣ SCENE SETUP
   // ===============================
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000428);
-  scene.fog = new THREE.Fog(0x000428, 200, 1500);
+  scene.background = new THREE.Color(0x000000);
+  // scene.fog = new THREE.Fog(0x000428, 200, 1500);
 
   const camera = new THREE.PerspectiveCamera(
     75,
@@ -66,19 +66,19 @@
     { 
       name: "Twilight", 
       depthRange: [2000, 6000], 
-      color: 0x0288d1,
+      color: 0x0ab8d1,
       count: 150 
     },
     { 
       name: "Midnight", 
       depthRange: [6000, 10000], 
-      color: 0x1a237e,
+      color: 0xfb9253ab,
       count: 150 
     },
     { 
       name: "Abyss", 
       depthRange: [10000, 14000], 
-      color: 0x311b92,
+      color: 0x31bac2,
       count: 100 
     },
     { 
@@ -294,14 +294,14 @@
   // 8️⃣ SPHERE PULSE ANIMATION
   // ===============================
   function animateSpheres() {
-    const time = Date.now() * 0.001;
+    const time = Date.now() * 0.005;
 
     spheres.forEach((sphere, i) => {
       // Skip animation for hovered sphere
       if (hovered === sphere) return;
 
       // Subtle pulse
-      const pulse = 1 + Math.sin(time * 2 + i * 0.1) * 0.05;
+      const pulse = 2 + Math.sin(time * 2 + i * 0.1) * 0.05;
       sphere.scale.set(pulse, pulse, pulse);
 
       // Gentle rotation
