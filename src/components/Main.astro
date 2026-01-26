@@ -93,13 +93,216 @@
   ];
 
   // ===============================
-  // 3️⃣ CREATE GLOWING SPHERES WITH CLUSTERS (LAZY LOADING)
+  // 3️⃣ CREATE GLOWING SPHERES WITH DISTANCE-BASED LAZY LOADING
   // ===============================
-  const spheres = [];
-  const glowSprites = [];
-  const clusterData = []; // Store cluster metadata for lazy loading
+  const sphereData = []; // Store all sphere metadata
+  const loadedSpheres = new Map(); // Track loaded spheres by index
   const geometry = new THREE.SphereGeometry(8, 16, 16);
-  const RENDER_DISTANCE = 2500; // Distance threshold for rendering
+  const RENDER_DISTANCE = 2500; // Distance threshold for rendering individual dots
+
+  // Performance tracking
+  const performanceStats = {
+    totalDots: 1000,
+    loadedDots: 0,
+    fps: 0,
+    frameTime: 0,
+    lastFrameTime: performance.now()
+  };
+
+  // Create performance display
+  const perfDisplay = document.createElement('div');
+  perfDisplay.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #00ff88;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    border-radius: 5px;
+    z-index: 1001;
+    line-height: 1.6;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+  `;
+  document.body.appendChild(perfDisplay);
+
+  function updatePerformanceDisplay() {
+    const now = performance.now();
+    const delta = now - performanceStats.lastFrameTime;
+    performanceStats.lastFrameTime = now;
+    performanceStats.fps = Math.round(1000 / delta);
+    performanceStats.frameTime = delta.toFixed(2);
+    
+    const memoryUsage = performance.memory ? 
+      `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)} MB` : 
+      'N/A';
+    
+    const loadPercentage = ((performanceStats.loadedDots / performanceStats.totalDots) * 100).toFixed(1);
+    const memorySaved = ((1 - performanceStats.loadedDots / performanceStats.totalDots) * 100).toFixed(0);
+    
+    perfDisplay.innerHTML = `
+      <strong>🚀 PERFORMANCE METRICS</strong><br>
+      ━━━━━━━━━━━━━━━━━━━━━━<br>
+      FPS: <span style="color: ${performanceStats.fps > 50 ? '#00ff88' : '#ff4500'}">${performanceStats.fps}</span><br>
+      Frame Time: ${performanceStats.frameTime}ms<br>
+      ━━━━━━━━━━━━━━━━━━━━━━<br>
+      <strong>📦 DISTANCE-BASED LOADING</strong><br>
+      Loaded Dots: ${performanceStats.loadedDots}/${performanceStats.totalDots} (${loadPercentage}%)<br>
+      Memory Saved: ~${memorySaved}%<br>
+      Render Distance: ${RENDER_DISTANCE} units<br>
+      ━━━━━━━━━━━━━━━━━━━━━━<br>
+      Memory Usage: ${memoryUsage}<br>
+      Camera: (${camera.position.x.toFixed(0)}, ${camera.position.y.toFixed(0)}, ${camera.position.z.toFixed(0)})<br>
+      <br>
+      <span style="color: #4fc3f7; font-size: 10px;">💡 Click minimap to teleport</span>
+    `;
+  }
+
+  // ===============================
+  // MINIMAP SETUP - ENHANCED WHOLE-SPACE MAP
+  // ===============================
+  const minimapCanvas = document.createElement('canvas');
+  minimapCanvas.width = 300; // Increased from 200 to 300
+  minimapCanvas.height = 300; // Increased from 200 to 300
+  minimapCanvas.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 3px solid rgba(0, 255, 136, 0.7);
+    border-radius: 15px;
+    z-index: 1001;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+  `;
+  document.body.appendChild(minimapCanvas);
+  const minimapCtx = minimapCanvas.getContext('2d');
+
+  // Calculate bounds of all dots for minimap scaling
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+
+  // Note: sphereData will be populated after this section, so we'll update bounds dynamically
+  function updateMinimapBounds() {
+    sphereData.forEach(data => {
+      minX = Math.min(minX, data.position.x);
+      maxX = Math.max(maxX, data.position.x);
+      minY = Math.min(minY, data.position.y);
+      maxY = Math.max(maxY, data.position.y);
+      minZ = Math.min(minZ, data.position.z);
+      maxZ = Math.max(maxZ, data.position.z);
+    });
+  }
+
+  const worldWidth = () => maxX - minX;
+  const worldHeight = () => maxZ - minZ;
+  const scale = () => Math.min(270 / worldWidth(), 270 / worldHeight()); // Adjusted for 300px canvas
+
+  // Minimap click handler for teleportation
+  minimapCanvas.addEventListener('click', (e) => {
+    const rect = minimapCanvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left - 150; // Center offset for 300px canvas
+    const clickY = e.clientY - rect.top - 150;
+    
+    // Convert minimap coordinates to world coordinates
+    const worldX = (clickX / scale()) + (minX + maxX) / 2;
+    const worldZ = (clickY / scale()) + (minZ + maxZ) / 2;
+    
+    // Teleport camera
+    camera.position.x = worldX;
+    camera.position.z = worldZ;
+    
+    console.log(`🚀 Teleported to (${worldX.toFixed(0)}, ${worldZ.toFixed(0)})`);
+  });
+
+  function updateMinimap() {
+    // Clear canvas
+    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+    minimapCtx.fillRect(0, 0, 300, 300);
+    
+    // Draw grid
+    minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    minimapCtx.lineWidth = 1;
+    for (let i = 0; i <= 300; i += 50) {
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(i, 0);
+      minimapCtx.lineTo(i, 300);
+      minimapCtx.stroke();
+      minimapCtx.beginPath();
+      minimapCtx.moveTo(0, i);
+      minimapCtx.lineTo(300, i);
+      minimapCtx.stroke();
+    }
+    
+    // Draw border
+    minimapCtx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.strokeRect(10, 30, 280, 260);
+    
+    // Draw all dots with cluster visualization
+    sphereData.forEach(data => {
+      const x = ((data.position.x - (minX + maxX) / 2) * scale()) + 150;
+      const y = ((data.position.z - (minZ + maxZ) / 2) * scale()) + 150;
+      
+      // Draw larger dots for better visibility
+      const isLoaded = loadedSpheres.has(data.index);
+      minimapCtx.fillStyle = `#${data.color.toString(16).padStart(6, '0')}`;
+      minimapCtx.globalAlpha = isLoaded ? 0.9 : 0.3;
+      minimapCtx.beginPath();
+      minimapCtx.arc(x, y, isLoaded ? 3 : 2, 0, Math.PI * 2);
+      minimapCtx.fill();
+    });
+    
+    minimapCtx.globalAlpha = 1;
+    
+    // Draw render distance circle
+    const renderRadiusOnMap = RENDER_DISTANCE * scale();
+    const camX = ((camera.position.x - (minX + maxX) / 2) * scale()) + 150;
+    const camY = ((camera.position.z - (minZ + maxZ) / 2) * scale()) + 150;
+    
+    minimapCtx.strokeStyle = 'rgba(135, 206, 235, 0.6)';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.setLineDash([5, 5]);
+    minimapCtx.beginPath();
+    minimapCtx.arc(camX, camY, renderRadiusOnMap, 0, Math.PI * 2);
+    minimapCtx.stroke();
+    minimapCtx.setLineDash([]);
+    
+    // Draw camera position with glow
+    minimapCtx.shadowBlur = 10;
+    minimapCtx.shadowColor = '#00ff88';
+    minimapCtx.fillStyle = '#00ff88';
+    minimapCtx.beginPath();
+    minimapCtx.arc(camX, camY, 5, 0, Math.PI * 2);
+    minimapCtx.fill();
+    minimapCtx.shadowBlur = 0;
+    
+    // Draw camera direction indicator
+    const dirLength = 20;
+    const dirX = Math.sin(camera.rotation.y) * dirLength;
+    const dirY = Math.cos(camera.rotation.y) * dirLength;
+    
+    minimapCtx.strokeStyle = '#00ff88';
+    minimapCtx.lineWidth = 3;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(camX, camY);
+    minimapCtx.lineTo(camX + dirX, camY - dirY);
+    minimapCtx.stroke();
+    
+    // Draw title with background
+    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    minimapCtx.fillRect(0, 0, 300, 25);
+    minimapCtx.fillStyle = '#00ff88';
+    minimapCtx.font = 'bold 14px Courier New';
+    minimapCtx.fillText('🗺️ WHOLE SPACE MAP', 15, 18);
+    
+    // Draw cluster count
+    minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    minimapCtx.font = '10px Courier New';
+    minimapCtx.fillText(`10 Clusters • ${sphereData.length} Dots`, 180, 18);
+  }
 
   // Create glow texture for sprites (enhanced neon glow)
   const canvas = document.createElement('canvas');
@@ -120,29 +323,22 @@
   ctx.fillRect(0, 0, 256, 256);
   const glowTexture = new THREE.CanvasTexture(canvas);
 
-  // Generate cluster metadata (don't create objects yet)
+  // Generate all sphere metadata (1000 dots in 10 clusters)
+  // INCREASED DISTANCE: Expanded from 7000 to 15000 for more space between clusters
+  let dotIndex = 0;
   for (let clusterIndex = 0; clusterIndex < 10; clusterIndex++) {
     const clusterColor = clusterColors[clusterIndex];
     
-    // Random cluster center in free space (increased distance between clusters)
+    // Random cluster center in free space - MUCH LARGER SPREAD
     const clusterCenter = new THREE.Vector3(
-      (Math.random() - 0.5) * 7000,
-      (Math.random() - 0.5) * 7000,
-      (Math.random() - 0.5) * 7000
+      (Math.random() - 0.5) * 15000,
+      (Math.random() - 0.5) * 15000,
+      (Math.random() - 0.5) * 15000
     );
 
-    const cluster = {
-      index: clusterIndex,
-      color: clusterColor,
-      center: clusterCenter,
-      spheres: [],
-      glowSprite: null,
-      loaded: false
-    };
-
-    // Generate sphere positions (but don't create meshes yet)
+    // Generate 100 dots per cluster - INCREASED CLUSTER SIZE
     for (let i = 0; i < 100; i++) {
-      const radius = Math.random() * 800 + 100;
+      const radius = Math.random() * 1200 + 200; // Increased from 800+100 to 1200+200
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
 
@@ -152,126 +348,90 @@
         clusterCenter.z + radius * Math.cos(phi)
       );
 
-      cluster.spheres.push({
+      sphereData.push({
+        index: dotIndex++,
         position: position,
+        color: clusterColor,
+        cluster: clusterIndex,
         title: `Cluster ${clusterIndex + 1} - Concept ${i + 1}`,
-        description: `A concept in cluster ${clusterIndex + 1}`,
-        mesh: null,
-        sprite: null
+        description: `A concept in cluster ${clusterIndex + 1}`
       });
     }
-
-    clusterData.push(cluster);
   }
 
-  console.log(`✅ Generated ${clusterData.length} clusters with metadata`);
+  console.log(`✅ Generated ${sphereData.length} dots with metadata`);
+  console.log(`📊 Distance-based loading enabled (${RENDER_DISTANCE} units)`);
+  
+  // Update minimap bounds after generating all sphere data
+  updateMinimapBounds();
 
-  // Function to load a cluster
-  function loadCluster(cluster) {
-    if (cluster.loaded) return;
+  // Function to load a single dot
+  function loadDot(data) {
+    if (loadedSpheres.has(data.index)) return;
 
-    // Create cluster glow
-    const clusterGlowMaterial = new THREE.SpriteMaterial({
+    const material = new THREE.MeshBasicMaterial({
+      color: data.color,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.position.copy(data.position);
+
+    // Add glow sprite
+    const spriteMaterial = new THREE.SpriteMaterial({
       map: glowTexture,
-      color: cluster.color,
+      color: data.color,
       transparent: true,
       blending: THREE.AdditiveBlending,
-      opacity: 0.15,
+      opacity: 0.5,
     });
-    cluster.glowSprite = new THREE.Sprite(clusterGlowMaterial);
-    cluster.glowSprite.scale.set(600, 600, 1);
-    cluster.glowSprite.position.copy(cluster.center);
-    scene.add(cluster.glowSprite);
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(50, 50, 1);
+    sprite.position.copy(data.position);
+    scene.add(sprite);
 
-    // Create spheres
-    cluster.spheres.forEach(sphereData => {
-      const material = new THREE.MeshBasicMaterial({
-        color: cluster.color,
-        transparent: true,
-        opacity: 0.9,
-      });
+    sphere.userData = {
+      title: data.title,
+      description: data.description,
+      cluster: data.cluster,
+      originalColor: data.color,
+      glowSprite: sprite,
+      dataIndex: data.index
+    };
 
-      const sphere = new THREE.Mesh(geometry, material);
-      sphere.position.copy(sphereData.position);
+    scene.add(sphere);
 
-      // Add glow sprite
-      const spriteMaterial = new THREE.SpriteMaterial({
-        map: glowTexture,
-        color: cluster.color,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        opacity: 0.5,
-      });
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.scale.set(50, 50, 1);
-      sprite.position.copy(sphereData.position);
-      scene.add(sprite);
-      glowSprites.push(sprite);
-
-      sphere.userData = {
-        title: sphereData.title,
-        description: sphereData.description,
-        cluster: cluster.index,
-        originalColor: cluster.color,
-        glowSprite: sprite
-      };
-
-      scene.add(sphere);
-      spheres.push(sphere);
-
-      sphereData.mesh = sphere;
-      sphereData.sprite = sprite;
-    });
-
-    cluster.loaded = true;
-    console.log(`Loaded cluster ${cluster.index + 1}`);
+    loadedSpheres.set(data.index, { sphere, sprite });
+    performanceStats.loadedDots++;
   }
 
-  // Function to unload a cluster
-  function unloadCluster(cluster) {
-    if (!cluster.loaded) return;
+  // Function to unload a single dot
+  function unloadDot(index) {
+    const loaded = loadedSpheres.get(index);
+    if (!loaded) return;
 
-    // Remove cluster glow
-    if (cluster.glowSprite) {
-      scene.remove(cluster.glowSprite);
-      cluster.glowSprite = null;
-    }
-
-    // Remove spheres
-    cluster.spheres.forEach(sphereData => {
-      if (sphereData.mesh) {
-        scene.remove(sphereData.mesh);
-        const index = spheres.indexOf(sphereData.mesh);
-        if (index > -1) spheres.splice(index, 1);
-        sphereData.mesh = null;
-      }
-      if (sphereData.sprite) {
-        scene.remove(sphereData.sprite);
-        const spriteIndex = glowSprites.indexOf(sphereData.sprite);
-        if (spriteIndex > -1) glowSprites.splice(spriteIndex, 1);
-        sphereData.sprite = null;
-      }
-    });
-
-    cluster.loaded = false;
-    console.log(`Unloaded cluster ${cluster.index + 1}`);
+    scene.remove(loaded.sphere);
+    scene.remove(loaded.sprite);
+    loadedSpheres.delete(index);
+    performanceStats.loadedDots--;
   }
 
-  // Function to update cluster loading based on camera distance
-  function updateClusterLoading() {
-    clusterData.forEach(cluster => {
-      const distance = camera.position.distanceTo(cluster.center);
+  // Function to update dot loading based on camera distance
+  function updateDotLoading() {
+    sphereData.forEach(data => {
+      const distance = camera.position.distanceTo(data.position);
       
-      if (distance < RENDER_DISTANCE && !cluster.loaded) {
-        loadCluster(cluster);
-      } else if (distance >= RENDER_DISTANCE && cluster.loaded) {
-        unloadCluster(cluster);
+      if (distance < RENDER_DISTANCE && !loadedSpheres.has(data.index)) {
+        loadDot(data);
+      } else if (distance >= RENDER_DISTANCE && loadedSpheres.has(data.index)) {
+        unloadDot(data.index);
       }
     });
   }
 
-  // Initial load of nearby clusters
-  updateClusterLoading();
+  // Initial load of nearby dots
+  updateDotLoading();
 
   // ===============================
   // 4️⃣ MINIMAL LIGHTING
@@ -370,15 +530,18 @@
   const haloGeometry = new THREE.RingGeometry(15, 20, 32);
 
   function handleHover() {
+    // Get all currently loaded spheres
+    const loadedSpheresArray = Array.from(loadedSpheres.values()).map(item => item.sphere);
+    
     raycaster.setFromCamera(centerMouse, camera);
-    const hits = raycaster.intersectObjects(spheres);
+    const hits = raycaster.intersectObjects(loadedSpheresArray);
 
     // Reset previous hover
     if (hovered) {
       hovered.material.color.setHex(hovered.userData.originalColor);
       hovered.material.opacity = 0.9;
       hovered.scale.set(1, 1, 1);
-      hovered.userData.glowSprite.material.opacity = 0.6;
+      hovered.userData.glowSprite.material.opacity = 0.5;
       hovered = null;
       
       // Remove halo
@@ -427,19 +590,22 @@
   function animateSpheres() {
     const time = Date.now() * 0.005;
 
-    spheres.forEach((sphere, i) => {
+    loadedSpheres.forEach((loaded, index) => {
+      const sphere = loaded.sphere;
+      const sprite = loaded.sprite;
+      
       // Skip animation for hovered sphere
       if (hovered === sphere) return;
 
       // Subtle pulse
-      const pulse = 1 + Math.sin(time * 2 + i * 0.1) * 0.05;
+      const pulse = 1 + Math.sin(time * 2 + index * 0.1) * 0.05;
       sphere.scale.set(pulse, pulse, pulse);
 
       // Gentle rotation
       sphere.rotation.y += 0.005;
       
       // Sync glow sprite with sphere
-      sphere.userData.glowSprite.position.copy(sphere.position);
+      sprite.position.copy(sphere.position);
     });
     
     // Update halo to always face camera
@@ -454,9 +620,11 @@
   function animate() {
     requestAnimationFrame(animate);
     movePlayer();
-    updateClusterLoading(); // Check distance and load/unload clusters
+    updateDotLoading(); // Check distance and load/unload individual dots
     handleHover();
     animateSpheres();
+    updatePerformanceDisplay(); // Update performance metrics
+    updateMinimap(); // Update minimap
     renderer.render(scene, camera);
   }
 
