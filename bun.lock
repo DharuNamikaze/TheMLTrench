@@ -5,9 +5,9 @@
       "name": "the-ml-trench-v2",
       "dependencies": {
         "astro": "^5.16.9",
-      },
-    },
-  },
+      }
+    }
+  }
   "packages": {
     "@astrojs/compiler": ["@astrojs/compiler@2.13.0", "", {}, "sha512-mqVORhUJViA28fwHYaWmsXSzLO9osbdZ5ImUfxBarqsYdMlPbqAqGJCxsNzvppp1BEzc1mJNjOVvQqeDN8Vspw=="],
 

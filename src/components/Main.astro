@@ -189,134 +189,161 @@
   }
 
   // ===============================
-  // MINIMAP SETUP - ENHANCED WHOLE-SPACE MAP
+  // MINIMAP SETUP - TOP-RIGHT OVERVIEW MAP
   // ===============================
-  const minimapCanvas = document.createElement('canvas');
-  minimapCanvas.width = 200;
-  minimapCanvas.height = 200;
-  minimapCanvas.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 200px;
-    height: 200px;
-    background: rgba(0, 0, 0, 0.9);
-    border: 3px solid rgba(0, 255, 136, 0.7);
-    border-radius: 15px;
-    z-index: 1001;
-    pointer-events: none;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
-  `;
-  document.body.appendChild(minimapCanvas);
+  // Create a 2D canvas minimap showing bird's-eye view of entire 3D space
+  // This helps users navigate and see where all clusters are located
   
-  const minimapCtx = minimapCanvas.getContext('2d');
+  const minimapCanvas = document.createElement('canvas');  // Create canvas element
+  minimapCanvas.width = 200;   // Internal resolution width
+  minimapCanvas.height = 200;  // Internal resolution height
+  minimapCanvas.style.cssText = `
+    position: fixed;                              /* Fix to viewport */
+    top: 20px;                                    /* 20px from top */
+    right: 20px;                                  /* 20px from right */
+    width: 200px;                                 /* Display width */
+    height: 200px;                                /* Display height */
+    background: rgba(0, 0, 0, 0.9);              /* Almost black background */
+    border: 3px solid rgba(0, 255, 136, 0.7);    /* Green border */
+    border-radius: 15px;                          /* Rounded corners */
+    z-index: 1001;                                /* Render above scene */
+    pointer-events: none;                         /* Non-interactive (no clicks) */
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); /* Glowing effect */
+  `;
+  document.body.appendChild(minimapCanvas);  // Add to page
+  
+  const minimapCtx = minimapCanvas.getContext('2d');  // Get 2D drawing context
 
-  // Calculate bounds of all dots for minimap scaling
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
+  // ===============================
+  // MINIMAP BOUNDS CALCULATION
+  // ===============================
+  // Track the min/max coordinates of all spheres to scale the minimap properly
+  let minX = Infinity, maxX = -Infinity;  // X-axis bounds
+  let minY = Infinity, maxY = -Infinity;  // Y-axis bounds
+  let minZ = Infinity, maxZ = -Infinity;  // Z-axis bounds
 
-  // Note: sphereData will be populated after this section, so we'll update bounds dynamically
+  // Function to calculate the bounding box of all spheres
+  // Called after sphere data is generated
   function updateMinimapBounds() {
+    // Loop through all sphere data and find min/max coordinates
     sphereData.forEach(data => {
-      minX = Math.min(minX, data.position.x);
-      maxX = Math.max(maxX, data.position.x);
-      minY = Math.min(minY, data.position.y);
-      maxY = Math.max(maxY, data.position.y);
-      minZ = Math.min(minZ, data.position.z);
-      maxZ = Math.max(maxZ, data.position.z);
+      minX = Math.min(minX, data.position.x);  // Find leftmost point
+      maxX = Math.max(maxX, data.position.x);  // Find rightmost point
+      minY = Math.min(minY, data.position.y);  // Find lowest point
+      maxY = Math.max(maxY, data.position.y);  // Find highest point
+      minZ = Math.min(minZ, data.position.z);  // Find nearest point
+      maxZ = Math.max(maxZ, data.position.z);  // Find farthest point
     });
   }
 
-  const worldWidth = () => maxX - minX;
-  const worldHeight = () => maxZ - minZ;
-  const scale = () => Math.min(170 / worldWidth(), 170 / worldHeight()); // Adjusted for 200px canvas
+  // Calculate world dimensions for scaling
+  const worldWidth = () => maxX - minX;   // Total width of the space
+  const worldHeight = () => maxZ - minZ;  // Total height of the space
+  // Calculate scale factor to fit entire world in 200px canvas (with 30px padding)
+  const scale = () => Math.min(170 / worldWidth(), 170 / worldHeight());
 
+  // ===============================
+  // UPDATE MINIMAP FUNCTION
+  // ===============================
+  // Draws the minimap every frame showing:
+  // - All dots (colored by cluster, opacity by load status)
+  // - Camera position and direction
+  // - Render distance circle
+  // - Grid and labels
   function updateMinimap() {
-    // Clear canvas
-    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';
-    minimapCtx.fillRect(0, 0, 200, 200);
+    // Clear the canvas for fresh draw
+    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';  // Almost black
+    minimapCtx.fillRect(0, 0, 200, 200);            // Fill entire canvas
     
-    // Draw grid
-    minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    // Draw background grid for spatial reference
+    minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';  // Faint white lines
     minimapCtx.lineWidth = 1;
-    for (let i = 0; i <= 200; i += 40) {
+    for (let i = 0; i <= 200; i += 40) {  // Every 40 pixels
+      // Vertical lines
       minimapCtx.beginPath();
       minimapCtx.moveTo(i, 0);
       minimapCtx.lineTo(i, 200);
       minimapCtx.stroke();
+      // Horizontal lines
       minimapCtx.beginPath();
       minimapCtx.moveTo(0, i);
       minimapCtx.lineTo(200, i);
       minimapCtx.stroke();
     }
     
-    // Draw border
-    minimapCtx.strokeStyle = 'rgba(0, 255, 136, 0.3)';
+    // Draw border frame
+    minimapCtx.strokeStyle = 'rgba(0, 255, 136, 0.3)';  // Subtle green
     minimapCtx.lineWidth = 2;
-    minimapCtx.strokeRect(10, 25, 180, 165);
+    minimapCtx.strokeRect(10, 25, 180, 165);  // Inner frame
     
-    // Draw all dots with cluster visualization
+    // Draw all dots (spheres) on the minimap
     sphereData.forEach(data => {
+      // Convert 3D world coordinates to 2D minimap coordinates
+      // Center the world, scale it, then offset to canvas center (100, 100)
       const x = ((data.position.x - (minX + maxX) / 2) * scale()) + 100;
       const y = ((data.position.z - (minZ + maxZ) / 2) * scale()) + 100;
       
-      // Draw larger dots for better visibility
+      // Check if this dot is currently loaded in the 3D scene
       const isLoaded = loadedSpheres.has(data.index);
+      // Use the dot's cluster color
       minimapCtx.fillStyle = `#${data.color.toString(16).padStart(6, '0')}`;
+      // Loaded dots are bright (0.9), unloaded are dim (0.3)
       minimapCtx.globalAlpha = isLoaded ? 0.9 : 0.3;
       minimapCtx.beginPath();
+      // Loaded dots are slightly larger (2.5px) than unloaded (1.5px)
       minimapCtx.arc(x, y, isLoaded ? 2.5 : 1.5, 0, Math.PI * 2);
       minimapCtx.fill();
     });
     
-    minimapCtx.globalAlpha = 1;
+    minimapCtx.globalAlpha = 1;  // Reset opacity
     
-    // Draw render distance circle
-    const renderRadiusOnMap = RENDER_DISTANCE * scale();
+    // Draw render distance circle (shows which dots are being rendered)
+    const renderRadiusOnMap = RENDER_DISTANCE * scale();  // Scale render distance to map
+    // Convert camera position to minimap coordinates
     const camX = ((camera.position.x - (minX + maxX) / 2) * scale()) + 100;
     const camY = ((camera.position.z - (minZ + maxZ) / 2) * scale()) + 100;
     
-    minimapCtx.strokeStyle = 'rgba(135, 206, 235, 0.6)';
+    minimapCtx.strokeStyle = 'rgba(135, 206, 235, 0.6)';  // Sky blue
     minimapCtx.lineWidth = 1.5;
-    minimapCtx.setLineDash([4, 4]);
+    minimapCtx.setLineDash([4, 4]);  // Dashed line
     minimapCtx.beginPath();
     minimapCtx.arc(camX, camY, renderRadiusOnMap, 0, Math.PI * 2);
     minimapCtx.stroke();
-    minimapCtx.setLineDash([]);
+    minimapCtx.setLineDash([]);  // Reset to solid line
     
-    // Draw camera position with glow
-    minimapCtx.shadowBlur = 8;
-    minimapCtx.shadowColor = '#00ff88';
-    minimapCtx.fillStyle = '#00ff88';
+    // Draw camera position with glow effect
+    minimapCtx.shadowBlur = 8;                  // Glow radius
+    minimapCtx.shadowColor = '#00ff88';         // Green glow
+    minimapCtx.fillStyle = '#00ff88';           // Green dot
     minimapCtx.beginPath();
-    minimapCtx.arc(camX, camY, 4, 0, Math.PI * 2);
+    minimapCtx.arc(camX, camY, 4, 0, Math.PI * 2);  // 4px radius dot
     minimapCtx.fill();
-    minimapCtx.shadowBlur = 0;
+    minimapCtx.shadowBlur = 0;  // Turn off glow for next draws
     
-    // Draw camera direction indicator
-    const dirLength = 15;
+    // Draw camera direction indicator (shows which way camera is facing)
+    const dirLength = 15;  // Length of direction line
+    // Calculate direction based on camera rotation
     const dirX = Math.sin(camera.rotation.y) * dirLength;
     const dirY = Math.cos(camera.rotation.y) * dirLength;
     
-    minimapCtx.strokeStyle = '#00ff88';
+    minimapCtx.strokeStyle = '#00ff88';  // Green line
     minimapCtx.lineWidth = 2;
     minimapCtx.beginPath();
-    minimapCtx.moveTo(camX, camY);
-    minimapCtx.lineTo(camX + dirX, camY - dirY);
+    minimapCtx.moveTo(camX, camY);  // Start at camera position
+    minimapCtx.lineTo(camX + dirX, camY - dirY);  // Draw to direction point
     minimapCtx.stroke();
     
-    // Draw title with background
-    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    minimapCtx.fillRect(0, 0, 200, 22);
-    minimapCtx.fillStyle = '#00ff88';
+    // Draw title bar at top
+    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';  // Dark background
+    minimapCtx.fillRect(0, 0, 200, 22);            // Title bar rectangle
+    minimapCtx.fillStyle = '#00ff88';              // Green text
     minimapCtx.font = 'bold 11px Courier New';
-    minimapCtx.fillText('🗺️ SPACE MAP', 10, 15);
+    minimapCtx.fillText('🗺️ SPACE MAP', 10, 15);  // Title
     
-    // Draw cluster count
-    minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    // Draw dot count in top right
+    minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';  // Light gray
     minimapCtx.font = '8px Courier New';
-    minimapCtx.fillText(`${sphereData.length} Dots`, 130, 15);
+    minimapCtx.fillText(`${sphereData.length} Dots`, 130, 15);  // Show total dots
   }
 
   // Create glow texture for sprites (enhanced neon glow)
