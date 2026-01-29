@@ -17,11 +17,62 @@
     padding:10px; font-size:11px;
     border-radius:6px; z-index:10;
   }
+  #crosshair {
+    position:fixed;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:30px; height:30px;
+    border:2px solid rgba(135,206,235,0.8);
+    border-radius:50%;
+    pointer-events:none;
+    z-index:100;
+    transition:all 0.2s ease;
+  }
+  #crosshair::after {
+    content:'';
+    position:absolute;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    width:4px; height:4px;
+    background:rgba(135,206,235,0.8);
+    border-radius:50%;
+    transition:all 0.2s ease;
+  }
+  #crosshair.active {
+    border-color:rgba(255,255,255,1);
+    width:40px; height:40px;
+    border-width:3px;
+  }
+  #crosshair.active::after {
+    width:6px; height:6px;
+    background:rgba(255,255,255,1);
+  }
+  #info {
+    position:fixed; bottom:10px; left:10px;
+    color:#9ff; font-family:monospace;
+    background:rgba(0,0,0,.8);
+    padding:12px; font-size:11px;
+    border-radius:6px; z-index:10;
+    max-width:300px;
+    display:none;
+    border:1px solid rgba(135,206,235,0.3);
+    animation:fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(10px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { transform:scale(1); }
+    50% { transform:scale(1.05); }
+  }
 </style>
 </head>
 
 <body>
 <div id="hud"></div>
+<div id="crosshair"></div>
+<div id="info"></div>
 
 <script type="module" is:inline>
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
@@ -63,6 +114,8 @@ document.body.appendChild(renderer.domElement);
 // HUD
 ////////////////////////////////////////////////////////////
 const hud = document.getElementById("hud");
+const crosshair = document.getElementById("crosshair");
+const info = document.getElementById("info");
 let last = performance.now(), fps = 0;
 
 ////////////////////////////////////////////////////////////
@@ -150,6 +203,7 @@ clusters.forEach((cluster, ci) => {
 // BUILD MESHES (ONE MATERIAL PER CLUSTER)
 ////////////////////////////////////////////////////////////
 const dummy = new THREE.Object3D();
+const allMeshes = []; // Track all meshes for raycasting
 
 for (const chunk of chunks.values()) {
   chunk.lod = { HIGH: [], MID: [], LOW: [] };
@@ -171,6 +225,14 @@ for (const chunk of chunks.values()) {
       );
       mesh.visible = false;
       mesh.frustumCulled = false;
+      
+      // Store metadata on the mesh itself
+      mesh.userData = {
+        clusterIndex: ci,
+        clusterColor: col,
+        points: points,
+        level: level
+      };
 
       points.forEach((p,i) => {
         dummy.position.copy(p);
@@ -181,7 +243,85 @@ for (const chunk of chunks.values()) {
       mesh.instanceMatrix.needsUpdate = true;
       scene.add(mesh);
       chunk.lod[level].push(mesh);
+      allMeshes.push(mesh);
     }
+  }
+}
+
+////////////////////////////////////////////////////////////
+// RAYCASTING & SELECTION
+////////////////////////////////////////////////////////////
+const raycaster = new THREE.Raycaster();
+const centerMouse = new THREE.Vector2(0, 0); // Center of screen
+let selectedSphere = null;
+
+// Create highlight ring
+const ringGeometry = new THREE.RingGeometry(12, 15, 32);
+const ringMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.8
+});
+const highlightMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+highlightMesh.visible = false;
+scene.add(highlightMesh);
+
+function checkSelection() {
+  raycaster.setFromCamera(centerMouse, camera);
+  
+  // Only raycast against visible meshes
+  const visibleMeshes = allMeshes.filter(m => m.visible);
+  
+  if (visibleMeshes.length === 0) {
+    selectedSphere = null;
+    crosshair.style.borderColor = 'rgba(135,206,235,0.8)';
+    highlightMesh.visible = false;
+    info.style.display = 'none';
+    return;
+  }
+  
+  const intersects = raycaster.intersectObjects(visibleMeshes);
+  
+  if (intersects.length > 0) {
+    const hit = intersects[0];
+    const instanceId = hit.instanceId;
+    const mesh = hit.object;
+    const userData = mesh.userData;
+    
+    // Get sphere position from the points array
+    const spherePos = userData.points[instanceId];
+    
+    selectedSphere = {
+      position: spherePos,
+      clusterIndex: userData.clusterIndex,
+      sphereIndex: instanceId,
+      distance: camera.position.distanceTo(spherePos)
+    };
+    
+    // Update crosshair
+    crosshair.style.borderColor = 'rgba(255,255,255,1)';
+    
+    // Position highlight ring
+    highlightMesh.position.copy(spherePos);
+    highlightMesh.lookAt(camera.position);
+    highlightMesh.visible = true;
+    
+    // Update info panel
+    info.style.display = 'block';
+    info.innerHTML = `
+      <strong>SPHERE SELECTED</strong><br>
+      Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
+      Sphere: ${selectedSphere.sphereIndex + 1}<br>
+      Position: (${spherePos.x.toFixed(0)}, ${spherePos.y.toFixed(0)}, ${spherePos.z.toFixed(0)})<br>
+      Distance: ${selectedSphere.distance.toFixed(0)} units<br>
+      LOD: ${userData.level}
+    `;
+  } else {
+    selectedSphere = null;
+    crosshair.style.borderColor = 'rgba(135,206,235,0.8)';
+    highlightMesh.visible = false;
+    info.style.display = 'none';
   }
 }
 
@@ -264,6 +404,7 @@ function loop(){
   last = now;
   move();
   update();
+  checkSelection(); // Check for sphere under crosshair
   renderer.render(scene, camera);
 }
 loop();
