@@ -385,11 +385,18 @@ height: 150px;   // was: 1px                              /* Display height */
     const clusterColor = clusterColors[clusterIndex];
 
     // Random cluster center in free space - MUCH LARGER SPREAD
-    const clusterCenter = new THREE.Vector3(
-      (Math.random() - 0.5) * 15000,
-      (Math.random() - 0.5) * 15000,
-      (Math.random() - 0.5) * 15000,
-    );
+    // First cluster spawns near origin (0, 0, 0) to ensure player sees something at start
+    const clusterCenter = clusterIndex === 0 
+      ? new THREE.Vector3(
+          (Math.random() - 0.5) * 1000,  // Close to origin
+          (Math.random() - 0.5) * 1000,
+          (Math.random() - 0.5) * 1000,
+        )
+      : new THREE.Vector3(
+          (Math.random() - 0.5) * 15000,  // Far spread for other clusters
+          (Math.random() - 0.5) * 15000,
+          (Math.random() - 0.5) * 15000,
+        );
 
     // Generate 100 dots per cluster - INCREASED CLUSTER SIZE
     for (let i = 0; i < 100; i++) {
