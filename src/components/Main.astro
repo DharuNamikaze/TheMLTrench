@@ -115,7 +115,7 @@ canvas#webgl-renderer {
   const sphereData = []; // Array to store metadata for all 1000 spheres
   const loadedSpheres = new Map(); // Map to track which spheres are currently loaded in the scene
   const geometry = new THREE.SphereGeometry(8, 16, 16); // Shared geometry for all spheres (radius=8, segments=16x16)
-  const RENDER_DISTANCE = 2500; // Only render spheres within 2500 units of camera
+  const RENDER_DISTANCE = 12500; // Only render spheres within 12500 units of camera (5x increased from 2500)
 
   // ===============================
   // PERFORMANCE TRACKING SYSTEM
