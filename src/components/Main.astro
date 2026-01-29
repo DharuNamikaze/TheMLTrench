@@ -9,30 +9,30 @@
   // GLOBAL CANVAS STYLING
   // ===============================
   // Create and inject CSS to make the canvas fullscreen without distortion
-  const style = document.createElement('style');
+  const style = document.createElement("style");
   style.textContent = `
     body {
       margin: 0;           /* Remove default body margin */
       padding: 0;          /* Remove default body padding */
       overflow: hidden;    /* Hide scrollbars for immersive experience */
     }
-    canvas {
-      display: block;                /* Remove inline spacing */
-      width: 100vw !important;       /* Force full viewport width */
-      height: 100vh !important;      /* Force full viewport height */
-      position: fixed;               /* Fix position to viewport */
-      top: 0;                        /* Align to top */
-      left: 0;                       /* Align to left */
-    }
+canvas#webgl-renderer {
+  display: block;
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
   `;
-  document.head.appendChild(style);  // Inject styles into document head
+  document.head.appendChild(style); // Inject styles into document head
 
   // ===============================
   // 0️⃣ CROSSHAIR SETUP
   // ===============================
   // Create a centered crosshair for aiming/targeting spheres
-  const crosshair = document.createElement('div');
-  crosshair.id = 'crosshair';
+  const crosshair = document.createElement("div");
+  crosshair.id = "crosshair";
   crosshair.style.cssText = `
     position: fixed;                              /* Fix to viewport */
     top: 50%;                                     /* Center vertically */
@@ -46,9 +46,9 @@
     z-index: 1000;                                /* Render above 3D scene */
     transition: border-color 0.2s;                /* Smooth color transition on hover */
   `;
-  
+
   // Create the center dot of the crosshair
-  const crosshairDot = document.createElement('div');
+  const crosshairDot = document.createElement("div");
   crosshairDot.style.cssText = `
     position: absolute;                           /* Position relative to parent */
     top: 50%;                                     /* Center vertically in parent */
@@ -59,35 +59,35 @@
     background: rgba(135, 206, 235, 0.8);        /* Sky blue fill */
     border-radius: 50%;                           /* Make it circular */
   `;
-  crosshair.appendChild(crosshairDot);  // Add dot to crosshair
-  document.body.appendChild(crosshair);  // Add crosshair to page
+  crosshair.appendChild(crosshairDot); // Add dot to crosshair
+  document.body.appendChild(crosshair); // Add crosshair to page
 
   // ===============================
   // 1️⃣ SCENE SETUP
   // ===============================
   // Create the 3D scene - this is the container for all 3D objects
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);  // Set background to black (space)
+  scene.background = new THREE.Color(0x000000); // Set background to black (space)
 
   // Create the camera - this is the viewer's perspective into the 3D world
   const camera = new THREE.PerspectiveCamera(
-    60,  // Field of view in degrees (reduced from 75 to 60 to reduce fisheye distortion)
-    window.innerWidth / window.innerHeight,  // Aspect ratio (width/height)
-    0.1,  // Near clipping plane (objects closer than this won't render)
-    5000,  // Far clipping plane (objects farther than this won't render)
+    60, // Field of view in degrees (reduced from 75 to 60 to reduce fisheye distortion)
+    window.innerWidth / window.innerHeight, // Aspect ratio (width/height)
+    0.1, // Near clipping plane (objects closer than this won't render)
+    5000, // Far clipping plane (objects farther than this won't render)
   );
-  camera.position.set(0, 0, 100);  // Start camera at origin, 100 units forward
+  camera.position.set(0, 0, 100); // Start camera at origin, 100 units forward
 
   // Create the renderer - this draws the 3D scene to the screen
-  const renderer = new THREE.WebGLRenderer({ 
-    antialias: true,                      // Smooth edges for better visual quality
-    alpha: false,                         // No transparency (opaque background)
-    powerPreference: "high-performance"   // Use GPU for better performance
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true, // Smooth edges for better visual quality
+    alpha: false, // No transparency (opaque background)
+    powerPreference: "high-performance", // Use GPU for better performance
   });
-  renderer.setSize(window.innerWidth, window.innerHeight);  // Match window size
-  renderer.setPixelRatio(window.devicePixelRatio);          // Handle high-DPI displays
-  document.body.appendChild(renderer.domElement);            // Add canvas to page
-
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.domElement.id = "webgl-renderer"; // Add this line
+  document.body.appendChild(renderer.domElement);
   // ===============================
   // 2️⃣ CLUSTER COLORS (10 clusters × 100 spheres = 1000 total)
   // ===============================
@@ -111,44 +111,47 @@
   // ===============================
   // PERFORMANCE OPTIMIZATION: Only render spheres within a certain distance from camera
   // This dramatically improves FPS by not rendering distant objects
-  
-  const sphereData = [];  // Array to store metadata for all 1000 spheres
-  const loadedSpheres = new Map();  // Map to track which spheres are currently loaded in the scene
-  const geometry = new THREE.SphereGeometry(8, 16, 16);  // Shared geometry for all spheres (radius=8, segments=16x16)
-  const RENDER_DISTANCE = 2500;  // Only render spheres within 2500 units of camera
+
+  const sphereData = []; // Array to store metadata for all 1000 spheres
+  const loadedSpheres = new Map(); // Map to track which spheres are currently loaded in the scene
+  const geometry = new THREE.SphereGeometry(8, 16, 16); // Shared geometry for all spheres (radius=8, segments=16x16)
+  const RENDER_DISTANCE = 2500; // Only render spheres within 2500 units of camera
 
   // ===============================
   // PERFORMANCE TRACKING SYSTEM
   // ===============================
   // Track and display real-time performance metrics
   const performanceStats = {
-    totalDots: 1000,                    // Total number of dots in the scene
-    loadedDots: 0,                      // Currently loaded/rendered dots
-    fps: 0,                             // Frames per second
-    frameTime: 0,                       // Time to render one frame (ms)
-    lastFrameTime: performance.now()    // Timestamp of last frame
+    totalDots: 1000, // Total number of dots in the scene
+    loadedDots: 0, // Currently loaded/rendered dots
+    fps: 0, // Frames per second
+    frameTime: 0, // Time to render one frame (ms)
+    lastFrameTime: performance.now(), // Timestamp of last frame
   };
 
   // ===============================
   // PERFORMANCE DISPLAY UI
   // ===============================
   // Create a HUD element to show real-time performance metrics
-  const perfDisplay = document.createElement('div');
+  const perfDisplay = document.createElement("div");
+  // Update the performance display CSS to be smaller and not overlap
   perfDisplay.style.cssText = `
-    position: fixed;                              /* Fix to viewport */
-    top: 10px;                                    /* 10px from top */
-    left: 10px;                                   /* 10px from left */
-    background: rgba(0, 0, 0, 0.7);              /* Semi-transparent black background */
-    color: #00ff88;                               /* Bright green text */
-    padding: 15px;                                /* Internal spacing */
-    font-family: 'Courier New', monospace;        /* Monospace font for data */
-    font-size: 12px;                              /* Readable size */
-    border-radius: 5px;                           /* Rounded corners */
-    z-index: 1001;                                /* Render above everything */
-    line-height: 1.6;                             /* Spacing between lines */
-    border: 1px solid rgba(0, 255, 136, 0.3);    /* Subtle green border */
-  `;
-  document.body.appendChild(perfDisplay);  // Add to page
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #00ff88;
+  padding: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border-radius: 5px;
+  z-index: 998;
+  line-height: 1.4;
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  max-width: 220px;
+  backdrop-filter: blur(2px);
+`;
+  document.body.appendChild(perfDisplay); // Add to page
 
   // ===============================
   // UPDATE PERFORMANCE DISPLAY
@@ -156,26 +159,32 @@
   // Function to calculate and update performance metrics every frame
   function updatePerformanceDisplay() {
     // Calculate FPS (frames per second)
-    const now = performance.now();                          // Current timestamp
-    const delta = now - performanceStats.lastFrameTime;     // Time since last frame
-    performanceStats.lastFrameTime = now;                   // Update last frame time
-    performanceStats.fps = Math.round(1000 / delta);        // FPS = 1000ms / frame time
-    performanceStats.frameTime = delta.toFixed(2);          // Frame time in ms
-    
+    const now = performance.now(); // Current timestamp
+    const delta = now - performanceStats.lastFrameTime; // Time since last frame
+    performanceStats.lastFrameTime = now; // Update last frame time
+    performanceStats.fps = Math.round(1000 / delta); // FPS = 1000ms / frame time
+    performanceStats.frameTime = delta.toFixed(2); // Frame time in ms
+
     // Get memory usage (if available in browser)
-    const memoryUsage = performance.memory ? 
-      `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)} MB` :  // Convert bytes to MB
-      'N/A';  // Not available in all browsers
-    
+    const memoryUsage = performance.memory
+      ? `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)} MB` // Convert bytes to MB
+      : "N/A"; // Not available in all browsers
+
     // Calculate loading statistics
-    const loadPercentage = ((performanceStats.loadedDots / performanceStats.totalDots) * 100).toFixed(1);  // % of dots loaded
-    const memorySaved = ((1 - performanceStats.loadedDots / performanceStats.totalDots) * 100).toFixed(0);  // % memory saved
-    
+    const loadPercentage = (
+      (performanceStats.loadedDots / performanceStats.totalDots) *
+      100
+    ).toFixed(1); // % of dots loaded
+    const memorySaved = (
+      (1 - performanceStats.loadedDots / performanceStats.totalDots) *
+      100
+    ).toFixed(0); // % memory saved
+
     // Update the display with formatted HTML
     perfDisplay.innerHTML = `
       <strong>🚀 PERFORMANCE METRICS</strong><br>
       ━━━━━━━━━━━━━━━━━━━━━━<br>
-      FPS: <span style="color: ${performanceStats.fps > 50 ? '#00ff88' : '#ff4500'}">${performanceStats.fps}</span><br>
+      FPS: <span style="color: ${performanceStats.fps > 50 ? "#00ff88" : "#ff4500"}">${performanceStats.fps}</span><br>
       Frame Time: ${performanceStats.frameTime}ms<br>
       ━━━━━━━━━━━━━━━━━━━━━━<br>
       <strong>📦 DISTANCE-BASED LOADING</strong><br>
@@ -193,54 +202,57 @@
   // ===============================
   // Create a 2D canvas minimap showing bird's-eye view of entire 3D space
   // This helps users navigate and see where all clusters are located
-  
-  const minimapCanvas = document.createElement('canvas');  // Create canvas element
-  minimapCanvas.width = 200;   // Internal resolution width
-  minimapCanvas.height = 200;  // Internal resolution height
+
+  const minimapCanvas = document.createElement("canvas"); // Create canvas element
+  minimapCanvas.width = 150; // Internal resolution width
+  minimapCanvas.height = 150; // Internal resolution height
   minimapCanvas.style.cssText = `
     position: fixed;                              /* Fix to viewport */
-    top: 20px;                                    /* 20px from top */
-    right: 20px;                                  /* 20px from right */
-    width: 200px;                                 /* Display width */
-    height: 200px;                                /* Display height */
+bottom: 20px;    // was: top: 20px
+left: 20px;      // was: right: 20px
+width: 150px;    // was: 1px
+height: 150px;   // was: 1px                              /* Display height */
     background: rgba(0, 0, 0, 0.9);              /* Almost black background */
-    border: 3px solid rgba(0, 255, 136, 0.7);    /* Green border */
-    border-radius: 15px;                          /* Rounded corners */
-    z-index: 1001;                                /* Render above scene */
+    border: 2px solid rgba(0, 255, 136, 0.7);    /* Green border */
+    border-radius: 10px;                          /* Rounded corners */
+    z-index: 999;                                 /* Render below crosshair */
     pointer-events: none;                         /* Non-interactive (no clicks) */
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); /* Glowing effect */
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.5); /* Glowing effect */
   `;
-  document.body.appendChild(minimapCanvas);  // Add to page
-  
-  const minimapCtx = minimapCanvas.getContext('2d');  // Get 2D drawing context
+  document.body.appendChild(minimapCanvas); // Add to page
+
+  const minimapCtx = minimapCanvas.getContext("2d"); // Get 2D drawing context
 
   // ===============================
   // MINIMAP BOUNDS CALCULATION
   // ===============================
   // Track the min/max coordinates of all spheres to scale the minimap properly
-  let minX = Infinity, maxX = -Infinity;  // X-axis bounds
-  let minY = Infinity, maxY = -Infinity;  // Y-axis bounds
-  let minZ = Infinity, maxZ = -Infinity;  // Z-axis bounds
+  let minX = Infinity,
+    maxX = -Infinity; // X-axis bounds
+  let minY = Infinity,
+    maxY = -Infinity; // Y-axis bounds
+  let minZ = Infinity,
+    maxZ = -Infinity; // Z-axis bounds
 
   // Function to calculate the bounding box of all spheres
   // Called after sphere data is generated
   function updateMinimapBounds() {
     // Loop through all sphere data and find min/max coordinates
-    sphereData.forEach(data => {
-      minX = Math.min(minX, data.position.x);  // Find leftmost point
-      maxX = Math.max(maxX, data.position.x);  // Find rightmost point
-      minY = Math.min(minY, data.position.y);  // Find lowest point
-      maxY = Math.max(maxY, data.position.y);  // Find highest point
-      minZ = Math.min(minZ, data.position.z);  // Find nearest point
-      maxZ = Math.max(maxZ, data.position.z);  // Find farthest point
+    sphereData.forEach((data) => {
+      minX = Math.min(minX, data.position.x); // Find leftmost point
+      maxX = Math.max(maxX, data.position.x); // Find rightmost point
+      minY = Math.min(minY, data.position.y); // Find lowest point
+      maxY = Math.max(maxY, data.position.y); // Find highest point
+      minZ = Math.min(minZ, data.position.z); // Find nearest point
+      maxZ = Math.max(maxZ, data.position.z); // Find farthest point
     });
   }
 
   // Calculate world dimensions for scaling
-  const worldWidth = () => maxX - minX;   // Total width of the space
-  const worldHeight = () => maxZ - minZ;  // Total height of the space
-  // Calculate scale factor to fit entire world in 200px canvas (with 30px padding)
-  const scale = () => Math.min(170 / worldWidth(), 170 / worldHeight());
+  const worldWidth = () => maxX - minX; // Total width of the space
+  const worldHeight = () => maxZ - minZ; // Total height of the space
+  // Calculate scale factor to fit entire world in 150px canvas (with 25px padding)
+  const scale = () => Math.min(125 / worldWidth(), 125 / worldHeight());
 
   // ===============================
   // UPDATE MINIMAP FUNCTION
@@ -252,115 +264,116 @@
   // - Grid and labels
   function updateMinimap() {
     // Clear the canvas for fresh draw
-    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.95)';  // Almost black
-    minimapCtx.fillRect(0, 0, 200, 200);            // Fill entire canvas
-    
+    minimapCtx.fillStyle = "rgba(0, 0, 0, 0.95)"; // Almost black
+    minimapCtx.fillRect(0, 0, 150, 150); // Fill entire canvas
+
     // Draw background grid for spatial reference
-    minimapCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';  // Faint white lines
+    minimapCtx.strokeStyle = "rgba(255, 255, 255, 0.15)"; // Faint white lines
     minimapCtx.lineWidth = 1;
-    for (let i = 0; i <= 200; i += 40) {  // Every 40 pixels
+    for (let i = 0; i <= 150; i += 30) {
+      // Every 30 pixels
       // Vertical lines
       minimapCtx.beginPath();
       minimapCtx.moveTo(i, 0);
-      minimapCtx.lineTo(i, 200);
+      minimapCtx.lineTo(i, 150);
       minimapCtx.stroke();
       // Horizontal lines
       minimapCtx.beginPath();
       minimapCtx.moveTo(0, i);
-      minimapCtx.lineTo(200, i);
+      minimapCtx.lineTo(150, i);
       minimapCtx.stroke();
     }
-    
+
     // Draw border frame
-    minimapCtx.strokeStyle = 'rgba(0, 255, 136, 0.3)';  // Subtle green
+    minimapCtx.strokeStyle = "rgba(0, 255, 136, 0.3)"; // Subtle green
     minimapCtx.lineWidth = 2;
-    minimapCtx.strokeRect(10, 25, 180, 165);  // Inner frame
-    
+    minimapCtx.strokeRect(8, 20, 134, 122); // Inner frame
+
     // Draw all dots (spheres) on the minimap
-    sphereData.forEach(data => {
+    sphereData.forEach((data) => {
       // Convert 3D world coordinates to 2D minimap coordinates
-      // Center the world, scale it, then offset to canvas center (100, 100)
-      const x = ((data.position.x - (minX + maxX) / 2) * scale()) + 100;
-      const y = ((data.position.z - (minZ + maxZ) / 2) * scale()) + 100;
-      
+      // Center the world, scale it, then offset to canvas center (75, 75)
+      const x = (data.position.x - (minX + maxX) / 2) * scale() + 75;
+      const y = (data.position.z - (minZ + maxZ) / 2) * scale() + 75;
+
       // Check if this dot is currently loaded in the 3D scene
       const isLoaded = loadedSpheres.has(data.index);
       // Use the dot's cluster color
-      minimapCtx.fillStyle = `#${data.color.toString(16).padStart(6, '0')}`;
+      minimapCtx.fillStyle = `#${data.color.toString(16).padStart(6, "0")}`;
       // Loaded dots are bright (0.9), unloaded are dim (0.3)
       minimapCtx.globalAlpha = isLoaded ? 0.9 : 0.3;
       minimapCtx.beginPath();
-      // Loaded dots are slightly larger (2.5px) than unloaded (1.5px)
-      minimapCtx.arc(x, y, isLoaded ? 2.5 : 1.5, 0, Math.PI * 2);
+      // Loaded dots are slightly larger (2px) than unloaded (1px)
+      minimapCtx.arc(x, y, isLoaded ? 2 : 1, 0, Math.PI * 2);
       minimapCtx.fill();
     });
-    
-    minimapCtx.globalAlpha = 1;  // Reset opacity
-    
+
+    minimapCtx.globalAlpha = 1; // Reset opacity
+
     // Draw render distance circle (shows which dots are being rendered)
-    const renderRadiusOnMap = RENDER_DISTANCE * scale();  // Scale render distance to map
+    const renderRadiusOnMap = RENDER_DISTANCE * scale(); // Scale render distance to map
     // Convert camera position to minimap coordinates
-    const camX = ((camera.position.x - (minX + maxX) / 2) * scale()) + 100;
-    const camY = ((camera.position.z - (minZ + maxZ) / 2) * scale()) + 100;
-    
-    minimapCtx.strokeStyle = 'rgba(135, 206, 235, 0.6)';  // Sky blue
+    const camX = (camera.position.x - (minX + maxX) / 2) * scale() + 75;
+    const camY = (camera.position.z - (minZ + maxZ) / 2) * scale() + 75;
+
+    minimapCtx.strokeStyle = "rgba(135, 206, 235, 0.6)"; // Sky blue
     minimapCtx.lineWidth = 1.5;
-    minimapCtx.setLineDash([4, 4]);  // Dashed line
+    minimapCtx.setLineDash([4, 4]); // Dashed line
     minimapCtx.beginPath();
     minimapCtx.arc(camX, camY, renderRadiusOnMap, 0, Math.PI * 2);
     minimapCtx.stroke();
-    minimapCtx.setLineDash([]);  // Reset to solid line
-    
+    minimapCtx.setLineDash([]); // Reset to solid line
+
     // Draw camera position with glow effect
-    minimapCtx.shadowBlur = 8;                  // Glow radius
-    minimapCtx.shadowColor = '#00ff88';         // Green glow
-    minimapCtx.fillStyle = '#00ff88';           // Green dot
+    minimapCtx.shadowBlur = 6; // Glow radius
+    minimapCtx.shadowColor = "#00ff88"; // Green glow
+    minimapCtx.fillStyle = "#00ff88"; // Green dot
     minimapCtx.beginPath();
-    minimapCtx.arc(camX, camY, 4, 0, Math.PI * 2);  // 4px radius dot
+    minimapCtx.arc(camX, camY, 3, 0, Math.PI * 2); // 3px radius dot
     minimapCtx.fill();
-    minimapCtx.shadowBlur = 0;  // Turn off glow for next draws
-    
+    minimapCtx.shadowBlur = 0; // Turn off glow for next draws
+
     // Draw camera direction indicator (shows which way camera is facing)
-    const dirLength = 15;  // Length of direction line
+    const dirLength = 12; // Length of direction line
     // Calculate direction based on camera rotation
     const dirX = Math.sin(camera.rotation.y) * dirLength;
     const dirY = Math.cos(camera.rotation.y) * dirLength;
-    
-    minimapCtx.strokeStyle = '#00ff88';  // Green line
+
+    minimapCtx.strokeStyle = "#00ff88"; // Green line
     minimapCtx.lineWidth = 2;
     minimapCtx.beginPath();
-    minimapCtx.moveTo(camX, camY);  // Start at camera position
-    minimapCtx.lineTo(camX + dirX, camY - dirY);  // Draw to direction point
+    minimapCtx.moveTo(camX, camY); // Start at camera position
+    minimapCtx.lineTo(camX + dirX, camY - dirY); // Draw to direction point
     minimapCtx.stroke();
-    
+
     // Draw title bar at top
-    minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.8)';  // Dark background
-    minimapCtx.fillRect(0, 0, 200, 22);            // Title bar rectangle
-    minimapCtx.fillStyle = '#00ff88';              // Green text
-    minimapCtx.font = 'bold 11px Courier New';
-    minimapCtx.fillText('🗺️ SPACE MAP', 10, 15);  // Title
-    
+    minimapCtx.fillStyle = "rgba(0, 0, 0, 0.8)"; // Dark background
+    minimapCtx.fillRect(0, 0, 150, 18); // Title bar rectangle
+    minimapCtx.fillStyle = "#00ff88"; // Green text
+    minimapCtx.font = "bold 10px Courier New";
+    minimapCtx.fillText("🗺️ MAP", 8, 12); // Title
+
     // Draw dot count in top right
-    minimapCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';  // Light gray
-    minimapCtx.font = '8px Courier New';
-    minimapCtx.fillText(`${sphereData.length} Dots`, 130, 15);  // Show total dots
+    minimapCtx.fillStyle = "rgba(255, 255, 255, 0.7)"; // Light gray
+    minimapCtx.font = "7px Courier New";
+    minimapCtx.fillText(`${sphereData.length}`, 115, 12); // Show total dots
   }
 
   // Create glow texture for sprites (enhanced neon glow)
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
+  const ctx = canvas.getContext("2d");
+
   // Create intense neon glow with multiple layers
   const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.1, 'rgba(255, 255, 255, 0.9)');
-  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.7)');
-  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.5)');
-  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
-  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.15)');
-  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+  gradient.addColorStop(0.1, "rgba(255, 255, 255, 0.9)");
+  gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.7)");
+  gradient.addColorStop(0.3, "rgba(255, 255, 255, 0.5)");
+  gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.3)");
+  gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.15)");
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 256, 256);
   const glowTexture = new THREE.CanvasTexture(canvas);
@@ -370,12 +383,12 @@
   let dotIndex = 0;
   for (let clusterIndex = 0; clusterIndex < 10; clusterIndex++) {
     const clusterColor = clusterColors[clusterIndex];
-    
+
     // Random cluster center in free space - MUCH LARGER SPREAD
     const clusterCenter = new THREE.Vector3(
       (Math.random() - 0.5) * 15000,
       (Math.random() - 0.5) * 15000,
-      (Math.random() - 0.5) * 15000
+      (Math.random() - 0.5) * 15000,
     );
 
     // Generate 100 dots per cluster - INCREASED CLUSTER SIZE
@@ -387,7 +400,7 @@
       const position = new THREE.Vector3(
         clusterCenter.x + radius * Math.sin(phi) * Math.cos(theta),
         clusterCenter.y + radius * Math.sin(phi) * Math.sin(theta),
-        clusterCenter.z + radius * Math.cos(phi)
+        clusterCenter.z + radius * Math.cos(phi),
       );
 
       sphereData.push({
@@ -396,14 +409,14 @@
         color: clusterColor,
         cluster: clusterIndex,
         title: `Cluster ${clusterIndex + 1} - Concept ${i + 1}`,
-        description: `A concept in cluster ${clusterIndex + 1}`
+        description: `A concept in cluster ${clusterIndex + 1}`,
       });
     }
   }
 
   console.log(`✅ Generated ${sphereData.length} dots with metadata`);
   console.log(`📊 Distance-based loading enabled (${RENDER_DISTANCE} units)`);
-  
+
   // Update minimap bounds after generating all sphere data
   updateMinimapBounds();
 
@@ -439,7 +452,7 @@
       cluster: data.cluster,
       originalColor: data.color,
       glowSprite: sprite,
-      dataIndex: data.index
+      dataIndex: data.index,
     };
 
     scene.add(sphere);
@@ -461,9 +474,9 @@
 
   // Function to update dot loading based on camera distance
   function updateDotLoading() {
-    sphereData.forEach(data => {
+    sphereData.forEach((data) => {
       const distance = camera.position.distanceTo(data.position);
-      
+
       if (distance < RENDER_DISTANCE && !loadedSpheres.has(data.index)) {
         loadDot(data);
       } else if (distance >= RENDER_DISTANCE && loadedSpheres.has(data.index)) {
@@ -500,16 +513,16 @@
   // Mouse move for free look (instant, no smoothing)
   document.addEventListener("mousemove", (e) => {
     if (!isLocked) return;
-    
+
     // Direct rotation control (no smoothing)
     rotationY -= e.movementX * 0.002;
     rotationX -= e.movementY * 0.002;
-    
+
     // Clamp vertical rotation to prevent flipping
     rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
-    
+
     // Apply rotation using proper Euler order to prevent gimbal lock
-    camera.rotation.order = 'YXZ';
+    camera.rotation.order = "YXZ";
     camera.rotation.y = rotationY;
     camera.rotation.x = rotationX;
   });
@@ -542,7 +555,7 @@
     const move = new THREE.Vector3();
     const forward = new THREE.Vector3(0, 0, -1);
     const right = new THREE.Vector3(1, 0, 0);
-    
+
     // Apply camera rotation to movement vectors
     forward.applyQuaternion(camera.quaternion);
     right.applyQuaternion(camera.quaternion);
@@ -567,14 +580,16 @@
   let halo = null;
 
   const centerMouse = new THREE.Vector2(0, 0);
-  
+
   // Create 2D ring geometry that always faces camera
   const haloGeometry = new THREE.RingGeometry(15, 20, 32);
 
   function handleHover() {
     // Get all currently loaded spheres
-    const loadedSpheresArray = Array.from(loadedSpheres.values()).map(item => item.sphere);
-    
+    const loadedSpheresArray = Array.from(loadedSpheres.values()).map(
+      (item) => item.sphere,
+    );
+
     raycaster.setFromCamera(centerMouse, camera);
     const hits = raycaster.intersectObjects(loadedSpheresArray);
 
@@ -585,7 +600,7 @@
       hovered.scale.set(1, 1, 1);
       hovered.userData.glowSprite.material.opacity = 0.5;
       hovered = null;
-      
+
       // Remove halo
       if (halo) {
         scene.remove(halo);
@@ -603,9 +618,9 @@
       hovered.scale.set(1.3, 1.3, 1.3);
       hovered.userData.glowSprite.material.opacity = 1.0;
 
-      crosshair.style.borderColor = 'rgba(255, 255, 255, 1)';
-      crosshairDot.style.background = 'rgba(255, 255, 255, 1)';
-      
+      crosshair.style.borderColor = "rgba(255, 255, 255, 1)";
+      crosshairDot.style.background = "rgba(255, 255, 255, 1)";
+
       // Create 2D ring that faces camera
       const haloMaterial = new THREE.MeshBasicMaterial({
         color: hovered.userData.originalColor,
@@ -613,16 +628,16 @@
         transparent: true,
         opacity: 0.8,
       });
-      
+
       halo = new THREE.Mesh(haloGeometry, haloMaterial);
       halo.position.copy(hovered.position);
       halo.lookAt(camera.position); // Always face camera (2D effect)
       scene.add(halo);
-      
+
       console.log(`Hovering: ${hovered.userData.title}`);
     } else {
-      crosshair.style.borderColor = 'rgba(135, 206, 235, 0.8)';
-      crosshairDot.style.background = 'rgba(135, 206, 235, 0.8)';
+      crosshair.style.borderColor = "rgba(135, 206, 235, 0.8)";
+      crosshairDot.style.background = "rgba(135, 206, 235, 0.8)";
     }
   }
 
@@ -635,7 +650,7 @@
     loadedSpheres.forEach((loaded, index) => {
       const sphere = loaded.sphere;
       const sprite = loaded.sprite;
-      
+
       // Skip animation for hovered sphere
       if (hovered === sphere) return;
 
@@ -645,11 +660,11 @@
 
       // Gentle rotation
       sphere.rotation.y += 0.005;
-      
+
       // Sync glow sprite with sphere
       sprite.position.copy(sphere.position);
     });
-    
+
     // Update halo to always face camera
     if (halo) {
       halo.lookAt(camera.position);
