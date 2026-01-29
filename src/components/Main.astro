@@ -74,7 +74,7 @@ canvas#webgl-renderer {
     60, // Field of view in degrees (reduced from 75 to 60 to reduce fisheye distortion)
     window.innerWidth / window.innerHeight, // Aspect ratio (width/height)
     0.1, // Near clipping plane (objects closer than this won't render)
-    25000, // Far clipping plane (increased to match render distance + buffer)
+    12500, // Far clipping plane (increased to match render distance + buffer)
   );
   camera.position.set(0, 0, 100); // Start camera at origin, 100 units forward
 
@@ -89,9 +89,9 @@ canvas#webgl-renderer {
   renderer.domElement.id = "webgl-renderer"; // Add this line
   document.body.appendChild(renderer.domElement);
   // ===============================
-  // 2️⃣ CLUSTER COLORS (10 clusters × 100 spheres = 1000 total)
+  // 2️⃣ CLUSTER COLORS (50 clusters × 100 spheres = 5000 total)
   // ===============================
-  // Define 10 distinct colors for the 10 clusters
+  // Define 50 distinct colors for the 50 clusters
   // Each cluster will have 100 spheres of the same color
   const clusterColors = [
     0x4fc3f7, // Cyan - Cluster 1
@@ -104,6 +104,46 @@ canvas#webgl-renderer {
     0xff1493, // Deep Pink - Cluster 8
     0x7fff00, // Chartreuse - Cluster 9
     0xff00ff, // Magenta - Cluster 10
+    0x1e90ff, // Dodger Blue - Cluster 11
+    0xff69b4, // Hot Pink - Cluster 12
+    0x32cd32, // Lime Green - Cluster 13
+    0xffa500, // Orange - Cluster 14
+    0x8a2be2, // Blue Violet - Cluster 15
+    0x00ffff, // Aqua - Cluster 16
+    0xff8c00, // Dark Orange - Cluster 17
+    0xadff2f, // Green Yellow - Cluster 18
+    0xff00bf, // Rose - Cluster 19
+    0x00bfff, // Deep Sky Blue - Cluster 20
+    0xffff00, // Yellow - Cluster 21
+    0xff1493, // Deep Pink 2 - Cluster 22
+    0x00fa9a, // Medium Spring Green - Cluster 23
+    0xff6347, // Tomato - Cluster 24
+    0x9400d3, // Dark Violet - Cluster 25
+    0x40e0d0, // Turquoise - Cluster 26
+    0xff7f50, // Coral - Cluster 27
+    0x7cfc00, // Lawn Green - Cluster 28
+    0xda70d6, // Orchid - Cluster 29
+    0x87ceeb, // Sky Blue - Cluster 30
+    0xffd700, // Gold 2 - Cluster 31
+    0xff4500, // Orange Red 2 - Cluster 32
+    0x00ff7f, // Spring Green - Cluster 33
+    0xff69b4, // Hot Pink 2 - Cluster 34
+    0x4169e1, // Royal Blue - Cluster 35
+    0xffa07a, // Light Salmon - Cluster 36
+    0x98fb98, // Pale Green - Cluster 37
+    0xdda0dd, // Plum - Cluster 38
+    0xf0e68c, // Khaki - Cluster 39
+    0xe0ffff, // Light Cyan - Cluster 40
+    0xffdab9, // Peach Puff - Cluster 41
+    0xb0e0e6, // Powder Blue - Cluster 42
+    0xffb6c1, // Light Pink - Cluster 43
+    0x90ee90, // Light Green - Cluster 44
+    0xffc0cb, // Pink - Cluster 45
+    0xadd8e6, // Light Blue - Cluster 46
+    0xf08080, // Light Coral - Cluster 47
+    0xe6e6fa, // Lavender - Cluster 48
+    0xfffacd, // Lemon Chiffon - Cluster 49
+    0xffe4e1, // Misty Rose - Cluster 50
   ];
 
   // ===============================
@@ -115,15 +155,15 @@ canvas#webgl-renderer {
   const sphereData = []; // Array to store metadata for all 1000 spheres
   const loadedSpheres = new Map(); // Map to track which spheres are currently loaded in the scene
   const geometry = new THREE.SphereGeometry(8, 16, 16); // Shared geometry for all spheres (radius=8, segments=16x16)
-  const RENDER_DISTANCE = 44000; // Load spheres within 20500 units of camera
-  const UNLOAD_DISTANCE = 44000; // Unload spheres beyond 24000 units (large buffer to keep entire clusters visible)
+  const RENDER_DISTANCE = 12500; // Load spheres within 20500 units of camera
+  const UNLOAD_DISTANCE = 12500; // Unload spheres beyond 24000 units (large buffer to keep entire clusters visible)
 
   // ===============================
   // PERFORMANCE TRACKING SYSTEM
   // ===============================
   // Track and display real-time performance metrics
   const performanceStats = {
-    totalDots: 1000, // Total number of dots in the scene
+    totalDots: 5000, // Total number of dots in the scene (50 clusters × 100 dots)
     loadedDots: 0, // Currently loaded/rendered dots
     fps: 0, // Frames per second
     frameTime: 0, // Time to render one frame (ms)
@@ -379,10 +419,10 @@ height: 150px;   // was: 1px                              /* Display height */
   ctx.fillRect(0, 0, 256, 256);
   const glowTexture = new THREE.CanvasTexture(canvas);
 
-  // Generate all sphere metadata (1000 dots in 10 clusters)
+  // Generate all sphere metadata (5000 dots in 50 clusters)
   // INCREASED DISTANCE: Expanded from 7000 to 15000 for more space between clusters
   let dotIndex = 0;
-  for (let clusterIndex = 0; clusterIndex < 10; clusterIndex++) {
+  for (let clusterIndex = 0; clusterIndex < 50; clusterIndex++) {
     const clusterColor = clusterColors[clusterIndex];
 
     // Random cluster center in free space - MUCH LARGER SPREAD
