@@ -1,48 +1,60 @@
+---
+/* Client-only Three.js clustered world */
+---
+
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Engine-Style Chunked LOD World</title>
-  <style>
-    body { margin:0; overflow:hidden; background:#000; }
-    #hud {
-      position:fixed; top:10px; left:10px;
-      color:#ff7a00; font-family:monospace;
-      background:rgba(0,0,0,.7); padding:10px;
-      font-size:11px; border-radius:6px;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clustered Regression World</title>
+<style>
+  body { margin:0; overflow:hidden; background:#000; }
+  #hud {
+    position:fixed; top:10px; left:10px;
+    color:#9ff; font-family:monospace;
+    background:rgba(0,0,0,.7);
+    padding:10px; font-size:11px;
+    border-radius:6px; z-index:10;
+  }
+</style>
 </head>
+
 <body>
 <div id="hud"></div>
 
-<script type="module">
+<script type="module" is:inline>
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
 ////////////////////////////////////////////////////////////
-// SETTINGS
+// CONFIG (REAL REGRESSION)
 ////////////////////////////////////////////////////////////
-const TOTAL_SPHERES = 10000;
-const CHUNK_SIZE   = 4000;
-const RENDER_DIST  = 8000;
+const CLUSTERS = 80;
+const SPHERES_PER_CLUSTER = 125;
+const CHUNK_SIZE = 4000;
+const RENDER_DIST = 9000;
 
-const LOD_DIST = {
-  HIGH: 800,
-  MID:  3000,
-  LOW:  8000
+// Regression coefficients (TUNE THESE)
+const REG = {
+  A: 800,   // radius growth
+  B: 250,   // base radius
+  C: 700,   // spacing
+  D: 450,   // vertical amp
+  E: 0.55   // vertical freq
 };
 
 ////////////////////////////////////////////////////////////
-// SCENE / CAMERA / RENDERER
+// SCENE
 ////////////////////////////////////////////////////////////
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, RENDER_DIST);
-camera.position.set(0,0,200);
+const camera = new THREE.PerspectiveCamera(
+  60, innerWidth / innerHeight, 0.1, RENDER_DIST
+);
+camera.position.set(0,0,300);
 
-const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:"high-performance" });
+const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 document.body.appendChild(renderer.domElement);
@@ -51,178 +63,194 @@ document.body.appendChild(renderer.domElement);
 // HUD
 ////////////////////////////////////////////////////////////
 const hud = document.getElementById("hud");
-let lastTime = performance.now(), fps = 0;
+let last = performance.now(), fps = 0;
 
 ////////////////////////////////////////////////////////////
-// GLOBAL GPU RESOURCES (CREATED ONCE)
+// GEOMETRY (7/10 QUALITY)
 ////////////////////////////////////////////////////////////
-const GEOMETRY = {
-  HIGH: new THREE.SphereGeometry(8,16,16),
-  MID:  new THREE.SphereGeometry(8,8,8),
-  LOW:  new THREE.SphereGeometry(8,4,4)
+const GEO = {
+  HIGH: new THREE.SphereGeometry(9,16,16),
+  MID:  new THREE.SphereGeometry(9,10,10),
+  LOW:  new THREE.SphereGeometry(9,6,6)
 };
 
-const MATERIAL = new THREE.MeshStandardMaterial({
-  color:0xffffff, transparent:true, opacity:0.95
-});
-
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-
 ////////////////////////////////////////////////////////////
-// GENERATE WORLD DATA (CPU-SIDE)
+// GENERATE CLUSTERS (REAL REGRESSION)
 ////////////////////////////////////////////////////////////
-const sphereData = [];
-let minX=Infinity, maxX=-Infinity, minZ=Infinity, maxZ=-Infinity;
+const clusters = [];
+for (let c = 0; c < CLUSTERS; c++) {
+  const radius = REG.A * Math.log(c + 1) + REG.B;
+  const dist   = REG.C * Math.sqrt(c);
+  const height = REG.D * Math.sin(c * REG.E);
 
-for(let i=0;i<TOTAL_SPHERES;i++){
-  const p = new THREE.Vector3(
-    (Math.random()-0.5)*15000,
-    (Math.random()-0.5)*2000,
-    (Math.random()-0.5)*15000
+  const center = new THREE.Vector3(
+    Math.cos(c) * dist,
+    height,
+    Math.sin(c) * dist
   );
-  sphereData.push(p);
-  minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
-  minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
+
+  const color = new THREE.Color(`hsl(${(c/CLUSTERS)*360}, 90%, 60%)`);
+
+  const points = [];
+  for (let i = 0; i < SPHERES_PER_CLUSTER; i++) {
+    const u = Math.random();
+    const v = Math.random();
+    const theta = u * 2 * Math.PI;
+    const phi = Math.acos(2*v - 1);
+    const r = Math.random() * radius;
+
+    points.push(
+      new THREE.Vector3(
+        center.x + r * Math.sin(phi) * Math.cos(theta),
+        center.y + r * Math.sin(phi) * Math.sin(theta),
+        center.z + r * Math.cos(phi)
+      )
+    );
+  }
+
+  clusters.push({ center, color, points });
 }
 
 ////////////////////////////////////////////////////////////
-// BUILD CHUNKS
+// CHUNKING
 ////////////////////////////////////////////////////////////
 const chunks = new Map();
-const originX=minX, originZ=minZ;
+let minX = Infinity, minZ = Infinity;
 
-for(let i=0;i<sphereData.length;i++){
-  const p=sphereData[i];
-  const cx=Math.floor((p.x-originX)/CHUNK_SIZE);
-  const cz=Math.floor((p.z-originZ)/CHUNK_SIZE);
-  const key=`${cx},${cz}`;
+clusters.forEach(c =>
+  c.points.forEach(p => {
+    minX = Math.min(minX, p.x);
+    minZ = Math.min(minZ, p.z);
+  })
+);
 
-  if(!chunks.has(key)){
-    const min=new THREE.Vector3(
-      originX+cx*CHUNK_SIZE,-2000,
-      originZ+cz*CHUNK_SIZE
-    );
-    const max=new THREE.Vector3(
-      originX+(cx+1)*CHUNK_SIZE,2000,
-      originZ+(cz+1)*CHUNK_SIZE
-    );
-    chunks.set(key,{
-      center:new THREE.Vector3(
-        (min.x+max.x)/2,0,(min.z+max.z)/2
-      ),
-      bbox:new THREE.Box3(min,max),
-      indices:[],
-      lod:{},
-      currentLOD:null
-    });
-  }
-  chunks.get(key).indices.push(i);
-}
-
-////////////////////////////////////////////////////////////
-// BUILD CHUNK LOD MESHES (ONCE)
-////////////////////////////////////////////////////////////
-const dummy=new THREE.Object3D();
-
-for(const chunk of chunks.values()){
-  for(const level of ["HIGH","MID","LOW"]){
-    const mesh=new THREE.InstancedMesh(
-      GEOMETRY[level], MATERIAL, chunk.indices.length
-    );
-    mesh.visible=false;
-    mesh.frustumCulled=false;
-
-    for(let i=0;i<chunk.indices.length;i++){
-      dummy.position.copy(sphereData[chunk.indices[i]]);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(i,dummy.matrix);
+clusters.forEach((cluster, ci) => {
+  cluster.points.forEach(p => {
+    const cx = Math.floor((p.x - minX) / CHUNK_SIZE);
+    const cz = Math.floor((p.z - minZ) / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    if (!chunks.has(key)) {
+      chunks.set(key, {
+        center: new THREE.Vector3(
+          minX + (cx + 0.5) * CHUNK_SIZE,
+          0,
+          minZ + (cz + 0.5) * CHUNK_SIZE
+        ),
+        clusters: new Map(),
+        current: null
+      });
     }
-    mesh.instanceMatrix.needsUpdate=true;
-    scene.add(mesh);
-    chunk.lod[level]=mesh;
+    if (!chunks.get(key).clusters.has(ci))
+      chunks.get(key).clusters.set(ci, []);
+    chunks.get(key).clusters.get(ci).push(p);
+  });
+});
+
+////////////////////////////////////////////////////////////
+// BUILD MESHES (ONE MATERIAL PER CLUSTER)
+////////////////////////////////////////////////////////////
+const dummy = new THREE.Object3D();
+
+for (const chunk of chunks.values()) {
+  chunk.lod = { HIGH: [], MID: [], LOW: [] };
+
+  for (const [ci, points] of chunk.clusters.entries()) {
+    const col = clusters[ci].color;
+
+    const material = new THREE.MeshStandardMaterial({
+      color: col,
+      emissive: col,
+      emissiveIntensity: 0.8
+    });
+
+    for (const level of ["HIGH","MID","LOW"]) {
+      const mesh = new THREE.InstancedMesh(
+        GEO[level],
+        material,
+        points.length
+      );
+      mesh.visible = false;
+      mesh.frustumCulled = false;
+
+      points.forEach((p,i) => {
+        dummy.position.copy(p);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      });
+
+      mesh.instanceMatrix.needsUpdate = true;
+      scene.add(mesh);
+      chunk.lod[level].push(mesh);
+    }
   }
 }
 
 ////////////////////////////////////////////////////////////
-// FRUSTUM / LOD LOGIC
+// LOD + VISIBILITY
 ////////////////////////////////////////////////////////////
-const frustum=new THREE.Frustum();
-const proj=new THREE.Matrix4();
-
 function pickLOD(d){
-  if(d<LOD_DIST.HIGH) return "HIGH";
-  if(d<LOD_DIST.MID)  return "MID";
+  if(d < 900) return "HIGH";
+  if(d < 3500) return "MID";
   return "LOW";
 }
 
-function updateChunks(){
-  proj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
-  frustum.setFromProjectionMatrix(proj);
+function update(){
+  let visible = 0;
 
-  let visible=0;
-
-  for(const chunk of chunks.values()){
-    const inView=frustum.intersectsBox(chunk.bbox) &&
-                 camera.position.distanceTo(chunk.center)<=RENDER_DIST;
-
-    if(!inView){
-      if(chunk.currentLOD){
-        chunk.lod[chunk.currentLOD].visible=false;
-        chunk.currentLOD=null;
-      }
+  for (const chunk of chunks.values()) {
+    const d = camera.position.distanceTo(chunk.center);
+    if (d > RENDER_DIST) {
+      if (chunk.current)
+        chunk.lod[chunk.current].forEach(m => m.visible=false);
+      chunk.current = null;
       continue;
     }
 
-    const d=camera.position.distanceTo(chunk.center);
-    const desired=pickLOD(d);
-
-    if(chunk.currentLOD!==desired){
-      if(chunk.currentLOD)
-        chunk.lod[chunk.currentLOD].visible=false;
-      chunk.lod[desired].visible=true;
-      chunk.currentLOD=desired;
+    const l = pickLOD(d);
+    if (chunk.current !== l) {
+      if (chunk.current)
+        chunk.lod[chunk.current].forEach(m => m.visible=false);
+      chunk.lod[l].forEach(m => m.visible=true);
+      chunk.current = l;
     }
 
-    visible+=chunk.indices.length;
+    chunk.lod[l].forEach(m => visible += m.count);
   }
 
-  hud.innerHTML=
-    `FPS: ${fps}<br>`+
-    `Visible: ${visible}/${TOTAL_SPHERES}<br>`+
-    `Cam: ${camera.position.x.toFixed(0)},${camera.position.y.toFixed(0)},${camera.position.z.toFixed(0)}`;
+  hud.innerHTML = `FPS: ${fps}<br>Visible: ${visible}`;
 }
 
 ////////////////////////////////////////////////////////////
-// MOVEMENT (SAFE)
+// MOVEMENT
 ////////////////////////////////////////////////////////////
-let rotX=0,rotY=0;
-const keys={};
+let rx=0, ry=0;
+const keys = {};
 
 document.body.onclick=()=>document.body.requestPointerLock();
-document.addEventListener("mousemove",e=>{
+
+addEventListener("mousemove",e=>{
   if(document.pointerLockElement!==document.body) return;
-  rotY-=e.movementX*0.002;
-  rotX-=e.movementY*0.002;
-  rotX=Math.max(-Math.PI/2,Math.min(Math.PI/2,rotX));
+  ry -= e.movementX * 0.002;
+  rx -= e.movementY * 0.002;
+  rx = Math.max(-Math.PI/2, Math.min(Math.PI/2, rx));
   camera.rotation.order="YXZ";
-  camera.rotation.set(rotX,rotY,0);
+  camera.rotation.set(rx, ry, 0);
 });
 
 addEventListener("keydown",e=>keys[e.code]=true);
 addEventListener("keyup",e=>keys[e.code]=false);
 
 function move(){
-  const dir=new THREE.Vector3();
-  const f=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  const r=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+  const dir = new THREE.Vector3();
+  const f = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const r = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
   if(keys.KeyW) dir.add(f);
   if(keys.KeyS) dir.sub(f);
   if(keys.KeyD) dir.add(r);
   if(keys.KeyA) dir.sub(r);
   if(dir.lengthSq()>0){
     dir.normalize();
-    const speed = keys.ShiftLeft ? 90 : 15; // 6x boost with Shift
-    camera.position.addScaledVector(dir,speed);
+    camera.position.addScaledVector(dir, keys.ShiftLeft ? 80 : 16);
   }
 }
 
@@ -231,18 +259,17 @@ function move(){
 ////////////////////////////////////////////////////////////
 function loop(){
   requestAnimationFrame(loop);
-  const now=performance.now();
-  fps=Math.round(1000/(now-lastTime));
-  lastTime=now;
-
+  const now = performance.now();
+  fps = Math.round(1000/(now-last));
+  last = now;
   move();
-  updateChunks();
-  renderer.render(scene,camera);
+  update();
+  renderer.render(scene, camera);
 }
 loop();
 
 addEventListener("resize",()=>{
-  camera.aspect=innerWidth/innerHeight;
+  camera.aspect = innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
