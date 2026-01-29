@@ -1,702 +1,250 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Optimized 3D Sphere Visualization</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Engine-Style Chunked LOD World</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      font-family: 'Courier New', monospace;
-    }
-    
-    canvas#webgl-renderer {
-      display: block;
-      width: 100vw !important;
-      height: 100vh !important;
-      position: fixed;
-      top: 0;
-      left: 0;
+    body { margin:0; overflow:hidden; background:#000; }
+    #hud {
+      position:fixed; top:10px; left:10px;
+      color:#ff7a00; font-family:monospace;
+      background:rgba(0,0,0,.7); padding:10px;
+      font-size:11px; border-radius:6px;
     }
   </style>
 </head>
 <body>
+<div id="hud"></div>
 
 <script type="module">
-  // ===============================
-  // OPTIMIZED 3D SPHERE VISUALIZATION
-  // Memory: ~500 MB → ~5-10 MB (98% reduction!)
-  // FPS: ~30-40 → ~60+ (50%+ improvement!)
-  // ===============================
-  
-  import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
-  // ===============================
-  // CROSSHAIR UI
-  // ===============================
-  const crosshair = document.createElement("div");
-  crosshair.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 30px;
-    height: 30px;
-    border: 2px solid rgba(135, 206, 235, 0.8);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 1000;
-    transition: border-color 0.2s;
-  `;
-  
-  const crosshairDot = document.createElement("div");
-  crosshairDot.style.cssText = `
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 4px;
-    height: 4px;
-    background: rgba(135, 206, 235, 0.8);
-    border-radius: 50%;
-  `;
-  crosshair.appendChild(crosshairDot);
-  document.body.appendChild(crosshair);
+////////////////////////////////////////////////////////////
+// SETTINGS
+////////////////////////////////////////////////////////////
+const TOTAL_SPHERES = 10000;
+const CHUNK_SIZE   = 4000;
+const RENDER_DIST  = 8000;
 
-  // ===============================
-  // SCENE SETUP
-  // ===============================
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
+const LOD_DIST = {
+  HIGH: 800,
+  MID:  3000,
+  LOW:  8000
+};
 
-  const camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    12500
+////////////////////////////////////////////////////////////
+// SCENE / CAMERA / RENDERER
+////////////////////////////////////////////////////////////
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, RENDER_DIST);
+camera.position.set(0,0,200);
+
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:"high-performance" });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+document.body.appendChild(renderer.domElement);
+
+////////////////////////////////////////////////////////////
+// HUD
+////////////////////////////////////////////////////////////
+const hud = document.getElementById("hud");
+let lastTime = performance.now(), fps = 0;
+
+////////////////////////////////////////////////////////////
+// GLOBAL GPU RESOURCES (CREATED ONCE)
+////////////////////////////////////////////////////////////
+const GEOMETRY = {
+  HIGH: new THREE.SphereGeometry(8,16,16),
+  MID:  new THREE.SphereGeometry(8,8,8),
+  LOW:  new THREE.SphereGeometry(8,4,4)
+};
+
+const MATERIAL = new THREE.MeshStandardMaterial({
+  color:0xffffff, transparent:true, opacity:0.95
+});
+
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+
+////////////////////////////////////////////////////////////
+// GENERATE WORLD DATA (CPU-SIDE)
+////////////////////////////////////////////////////////////
+const sphereData = [];
+let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+
+for(let i=0;i<TOTAL_SPHERES;i++){
+  const p = new THREE.Vector3(
+    (Math.random()-0.5)*15000,
+    (Math.random()-0.5)*2000,
+    (Math.random()-0.5)*15000
   );
-  camera.position.set(0, 0, 100);
-
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: false,
-    powerPreference: "high-performance",
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.domElement.id = "webgl-renderer";
-  document.body.appendChild(renderer.domElement);
-
-  // ===============================
-  // PERFORMANCE STATS UI
-  // ===============================
-  const perfDisplay = document.createElement("div");
-  perfDisplay.style.cssText = `
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.7);
-    color: #fc6203;
-    padding: 10px;
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    border-radius: 5px;
-    z-index: 998;
-    line-height: 1.4;
-    border: 1px solid rgba(0, 255, 36, 0.3);
-    max-width: 280px;
-    backdrop-filter: blur(2px);
-  `;
-  document.body.appendChild(perfDisplay);
-
-  const performanceStats = {
-    totalDots: 10000,
-    visibleDots: 0,
-    fps: 0,
-    frameTime: 0,
-    lastFrameTime: performance.now(),
-  };
-
-  function updatePerformanceDisplay() {
-    const now = performance.now();
-    const delta = now - performanceStats.lastFrameTime;
-    performanceStats.lastFrameTime = now;
-    performanceStats.fps = Math.round(1000 / delta);
-    performanceStats.frameTime = delta.toFixed(2);
-
-    const memoryUsage = performance.memory
-      ? `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)} MB`
-      : "N/A";
-
-    const visiblePercentage = (
-      (performanceStats.visibleDots / performanceStats.totalDots) * 100
-    ).toFixed(1);
-
-    perfDisplay.innerHTML = `
-      <strong>🚀 OPTIMIZED PERFORMANCE</strong><br>
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-      FPS: <span style="color: ${performanceStats.fps > 50 ? "#00ff88" : "#ff4500"}">${performanceStats.fps}</span><br>
-      Frame Time: ${performanceStats.frameTime}ms<br>
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-      <strong>📦 INSTANCED RENDERING</strong><br>
-      Total Dots: ${performanceStats.totalDots}<br>
-      Visible: ${performanceStats.visibleDots} (${visiblePercentage}%)<br>
-      Draw Calls: 1 (was 10,000!)<br>
-      ━━━━━━━━━━━━━━━━━━━━━━━━━━<br>
-      Memory: ${memoryUsage}<br>
-      Camera: (${camera.position.x.toFixed(0)}, ${camera.position.y.toFixed(0)}, ${camera.position.z.toFixed(0)})<br>
-      <span style="color: #00ff88;">✓ 98% Memory Saved!</span>
-    `;
-  }
-
-  // ===============================
-  // MINIMAP
-  // ===============================
-  const minimapCanvas = document.createElement("canvas");
-  minimapCanvas.width = 150;
-  minimapCanvas.height = 150;
-  minimapCanvas.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    width: 150px;
-    height: 150px;
-    background: rgba(0, 0, 0, 0.9);
-    border: 2px solid rgba(0, 255, 136, 0.7);
-    border-radius: 10px;
-    z-index: 999;
-    pointer-events: none;
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
-  `;
-  document.body.appendChild(minimapCanvas);
-  const minimapCtx = minimapCanvas.getContext("2d");
-
-  // ===============================
-  // CLUSTER COLORS (50 clusters)
-  // ===============================
-  const clusterColors = [
-    0x4fc3f7, 0xff6b9d, 0x00ff88, 0xffd700, 0xff4500,
-    0x9370db, 0x00ced1, 0xff1493, 0x7fff00, 0xff00ff,
-    0x1e90ff, 0xff69b4, 0x32cd32, 0xffa500, 0x8a2be2,
-    0x00ffff, 0xff8c00, 0xadff2f, 0xff00bf, 0x00bfff,
-    0xffff00, 0xff1493, 0x00fa9a, 0xff6347, 0x9400d3,
-    0x40e0d0, 0xff7f50, 0x7cfc00, 0xda70d6, 0x87ceeb,
-    0xffd700, 0xff4500, 0x00ff7f, 0xff69b4, 0x4169e1,
-    0xffa07a, 0x98fb98, 0xdda0dd, 0xf0e68c, 0xe0ffff,
-    0xffdab9, 0xb0e0e6, 0xffb6c1, 0x90ee90, 0xffc0cb,
-    0xadd8e6, 0xf08080, 0xe6e6fa, 0xfffacd, 0xffe4e1,
-  ];
-
-  // ===============================
-  // GENERATE SPHERE METADATA (LIGHTWEIGHT!)
-  // ===============================
-  // Instead of creating 5000 THREE.js objects, we just store DATA
-  const sphereData = [];
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-
-  let dotIndex = 0;
-  for (let clusterIndex = 0; clusterIndex < 100; clusterIndex++) {
-    const clusterColor = clusterColors[clusterIndex % 50]; // Cycle through 50 colors for 100 clusters
-    
-    const clusterCenter = clusterIndex === 0 
-      ? new THREE.Vector3(
-          (Math.random() - 0.5) * 1000,
-          (Math.random() - 0.5) * 1000,
-          (Math.random() - 0.5) * 1000
-        )
-      : new THREE.Vector3(
-          (Math.random() - 0.5) * 15000,
-          (Math.random() - 0.5) * 15000,
-          (Math.random() - 0.5) * 15000
-        );
-
-    for (let i = 0; i < 100; i++) {
-      const radius = Math.random() * 1200 + 200;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-
-      const position = new THREE.Vector3(
-        clusterCenter.x + radius * Math.sin(phi) * Math.cos(theta),
-        clusterCenter.y + radius * Math.sin(phi) * Math.sin(theta),
-        clusterCenter.z + radius * Math.cos(phi)
-      );
-
-      // Track bounds for minimap
-      minX = Math.min(minX, position.x);
-      maxX = Math.max(maxX, position.x);
-      minY = Math.min(minY, position.y);
-      maxY = Math.max(maxY, position.y);
-      minZ = Math.min(minZ, position.z);
-      maxZ = Math.max(maxZ, position.z);
-
-      sphereData.push({
-        index: dotIndex++,
-        position: position,
-        color: clusterColor,
-        cluster: clusterIndex,
-        title: `Cluster ${clusterIndex + 1} - Concept ${i + 1}`,
-        description: `A concept in cluster ${clusterIndex + 1}`,
-      });
-    }
-  }
-
-  console.log(`✅ Generated ${sphereData.length} sphere metadata (lightweight!)`);
-
-  // ===============================
-  // CREATE SINGLE INSTANCED MESH FOR ALL 10000 SPHERES
-  // This is THE KEY optimization!
-  // ===============================
-  const geometry = new THREE.SphereGeometry(8, 16, 16);
-  const material = new THREE.MeshBasicMaterial({
-    transparent: true,
-    opacity: 0.9,
-  });
-
-  // ONE mesh that will draw 10000 copies!
-  const instancedMesh = new THREE.InstancedMesh(geometry, material, 10000);
-  instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // Will be updated
-
-  // Set position and color for each instance
-  const matrix = new THREE.Matrix4();
-  const color = new THREE.Color();
-  const dummy = new THREE.Object3D(); // Reusable helper object
-
-  sphereData.forEach((data, i) => {
-    // Set position using matrix
-    dummy.position.copy(data.position);
-    dummy.updateMatrix();
-    instancedMesh.setMatrixAt(i, dummy.matrix);
-    
-    // Set color
-    color.setHex(data.color);
-    instancedMesh.setColorAt(i, color);
-  });
-
-  // Tell GPU to update the buffers
-  instancedMesh.instanceMatrix.needsUpdate = true;
-  if (instancedMesh.instanceColor) {
-    instancedMesh.instanceColor.needsUpdate = true;
-  }
-
-  scene.add(instancedMesh);
-
-  console.log('✅ Created 1 InstancedMesh for all 10000 spheres');
-  console.log(`📊 Memory estimate: ~${((10000 * 24) / 1024).toFixed(2)} KB (vs ~1GB before!)`);
-
-  // ===============================
-  // CREATE GLOW SPRITES (OPTIMIZED WITH INSTANCING)
-  // ===============================
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d");
-
-  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-  gradient.addColorStop(0.1, "rgba(255, 255, 255, 0.9)");
-  gradient.addColorStop(0.2, "rgba(255, 255, 255, 0.7)");
-  gradient.addColorStop(0.3, "rgba(255, 255, 255, 0.5)");
-  gradient.addColorStop(0.5, "rgba(255, 255, 255, 0.3)");
-  gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.15)");
-  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 256, 256);
-  const glowTexture = new THREE.CanvasTexture(canvas);
-
-  // Use Points instead of individual sprites for glow effect
-  const glowGeometry = new THREE.BufferGeometry();
-  const glowPositions = new Float32Array(10000 * 3);
-  const glowColors = new Float32Array(10000 * 3);
-
-  sphereData.forEach((data, i) => {
-    glowPositions[i * 3] = data.position.x;
-    glowPositions[i * 3 + 1] = data.position.y;
-    glowPositions[i * 3 + 2] = data.position.z;
-
-    const col = new THREE.Color(data.color);
-    glowColors[i * 3] = col.r;
-    glowColors[i * 3 + 1] = col.g;
-    glowColors[i * 3 + 2] = col.b;
-  });
-
-  glowGeometry.setAttribute('position', new THREE.BufferAttribute(glowPositions, 3));
-  glowGeometry.setAttribute('color', new THREE.BufferAttribute(glowColors, 3));
-
-  const glowMaterial = new THREE.PointsMaterial({
-    size: 50,
-    map: glowTexture,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    opacity: 0.5,
-    vertexColors: true,
-    depthWrite: false,
-    sizeAttenuation: true, // Make glow size scale with distance
-  });
-
-  const glowPoints = new THREE.Points(glowGeometry, glowMaterial);
-  scene.add(glowPoints);
-
-  console.log('✅ Created glow effect using Points (1 draw call instead of 5000!)');
-
-  // ===============================
-  // FRUSTUM CULLING (GPU does this automatically!)
-  // ===============================
-  // With InstancedMesh, Three.js's built-in frustum culling works
-  // It won't render instances outside the camera view
-  // This gives us "free" performance optimization!
-
-  // ===============================
-  // UPDATE MINIMAP
-  // ===============================
-  const worldWidth = maxX - minX;
-  const worldHeight = maxZ - minZ;
-  const scale = Math.min(125 / worldWidth, 125 / worldHeight);
-
-  function updateMinimap() {
-    minimapCtx.fillStyle = "rgba(0, 0, 0, 0.95)";
-    minimapCtx.fillRect(0, 0, 150, 150);
-
-    // Grid
-    minimapCtx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-    minimapCtx.lineWidth = 1;
-    for (let i = 0; i <= 150; i += 30) {
-      minimapCtx.beginPath();
-      minimapCtx.moveTo(i, 0);
-      minimapCtx.lineTo(i, 150);
-      minimapCtx.stroke();
-      minimapCtx.beginPath();
-      minimapCtx.moveTo(0, i);
-      minimapCtx.lineTo(150, i);
-      minimapCtx.stroke();
-    }
-
-    // Border
-    minimapCtx.strokeStyle = "rgba(0, 255, 136, 0.3)";
-    minimapCtx.lineWidth = 2;
-    minimapCtx.strokeRect(8, 20, 134, 122);
-
-    // Draw all dots
-    sphereData.forEach((data) => {
-      const x = (data.position.x - (minX + maxX) / 2) * scale + 75;
-      const y = (data.position.z - (minZ + maxZ) / 2) * scale + 75;
-
-      minimapCtx.fillStyle = `#${data.color.toString(16).padStart(6, "0")}`;
-      minimapCtx.globalAlpha = 0.7;
-      minimapCtx.beginPath();
-      minimapCtx.arc(x, y, 1.5, 0, Math.PI * 2);
-      minimapCtx.fill();
-    });
-
-    minimapCtx.globalAlpha = 1;
-
-    // Camera position
-    const camX = (camera.position.x - (minX + maxX) / 2) * scale + 75;
-    const camY = (camera.position.z - (minZ + maxZ) / 2) * scale + 75;
-
-    minimapCtx.shadowBlur = 6;
-    minimapCtx.shadowColor = "#00ff88";
-    minimapCtx.fillStyle = "#00ff88";
-    minimapCtx.beginPath();
-    minimapCtx.arc(camX, camY, 3, 0, Math.PI * 2);
-    minimapCtx.fill();
-    minimapCtx.shadowBlur = 0;
-
-    // Camera direction
-    const dirLength = 12;
-    const dirX = Math.sin(camera.rotation.y) * dirLength;
-    const dirY = Math.cos(camera.rotation.y) * dirLength;
-
-    minimapCtx.strokeStyle = "#00ff88";
-    minimapCtx.lineWidth = 2;
-    minimapCtx.beginPath();
-    minimapCtx.moveTo(camX, camY);
-    minimapCtx.lineTo(camX + dirX, camY - dirY);
-    minimapCtx.stroke();
-
-    // Title
-    minimapCtx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    minimapCtx.fillRect(0, 0, 150, 18);
-    minimapCtx.fillStyle = "#00ff88";
-    minimapCtx.font = "bold 10px Courier New";
-    minimapCtx.fillText("🗺️ MAP", 8, 12);
-    
-    minimapCtx.fillStyle = "rgba(255, 255, 255, 0.7)";
-    minimapCtx.font = "7px Courier New";
-    minimapCtx.fillText(`${sphereData.length}`, 115, 12);
-  }
-
-  // ===============================
-  // LIGHTING
-  // ===============================
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-  scene.add(ambientLight);
-
-  // ===============================
-  // CAMERA CONTROLS (POINTER LOCK)
-  // ===============================
-  let rotationX = 0;
-  let rotationY = 0;
-  let isLocked = false;
-
-  document.body.addEventListener("click", () => {
-    document.body.requestPointerLock();
-  });
-
-  document.addEventListener("pointerlockchange", () => {
-    isLocked = document.pointerLockElement === document.body;
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!isLocked) return;
-
-    rotationY -= e.movementX * 0.002;
-    rotationX -= e.movementY * 0.002;
-    rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
-
-    camera.rotation.order = "YXZ";
-    camera.rotation.y = rotationY;
-    camera.rotation.x = rotationX;
-  });
-
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Escape") {
-      document.exitPointerLock();
-    }
-  });
-
-  // ===============================
-  // KEYBOARD MOVEMENT
-  // ===============================
-  const keys = {};
-  let speed = 8;
-  let isBoosting = false;
-
-  window.addEventListener("keydown", (e) => {
-    keys[e.code] = true;
-    if (e.code === "ShiftLeft") isBoosting = true;
-  });
-
-  window.addEventListener("keyup", (e) => {
-    keys[e.code] = false;
-    if (e.code === "ShiftLeft") isBoosting = false;
-  });
-
-  function movePlayer() {
-    const move = new THREE.Vector3();
-    const forward = new THREE.Vector3(0, 0, -1);
-    const right = new THREE.Vector3(1, 0, 0);
-
-    forward.applyQuaternion(camera.quaternion);
-    right.applyQuaternion(camera.quaternion);
-
-    if (keys["KeyW"]) move.add(forward);
-    if (keys["KeyS"]) move.sub(forward);
-    if (keys["KeyD"]) move.add(right);
-    if (keys["KeyA"]) move.sub(right);
-
-    move.normalize();
-
-    const currentSpeed = isBoosting ? speed * 18 : speed;
-    camera.position.addScaledVector(move, currentSpeed);
-  }
-
-  // ===============================
-  // RAYCASTING FOR HOVER (OPTIMIZED!)
-  // ===============================
-  const raycaster = new THREE.Raycaster();
-  raycaster.far = 500;
-  let hoveredInstanceId = -1;
-  let halo = null;
-
-  const centerMouse = new THREE.Vector2(0, 0);
-  const haloGeometry = new THREE.RingGeometry(15, 20, 32);
-
-  function handleHover() {
-    // Reset previous hover
-    if (hoveredInstanceId !== -1) {
-      // Restore original color
-      color.setHex(sphereData[hoveredInstanceId].color);
-      instancedMesh.setColorAt(hoveredInstanceId, color);
-      instancedMesh.instanceColor.needsUpdate = true;
-      
-      // Restore scale
-      dummy.position.copy(sphereData[hoveredInstanceId].position);
-      dummy.scale.set(1, 1, 1);
-      dummy.updateMatrix();
-      instancedMesh.setMatrixAt(hoveredInstanceId, dummy.matrix);
-      instancedMesh.instanceMatrix.needsUpdate = true;
-      
-      hoveredInstanceId = -1;
-
-      if (halo) {
-        scene.remove(halo);
-        halo = null;
-      }
-    }
-
-    // Raycast against instanced mesh
-    raycaster.setFromCamera(centerMouse, camera);
-    const intersects = raycaster.intersectObject(instancedMesh);
-
-    if (intersects.length > 0) {
-      hoveredInstanceId = intersects[0].instanceId;
-      const data = sphereData[hoveredInstanceId];
-
-      // Brighten
-      color.set(0xffffff);
-      instancedMesh.setColorAt(hoveredInstanceId, color);
-      instancedMesh.instanceColor.needsUpdate = true;
-
-      // Scale up
-      dummy.position.copy(data.position);
-      dummy.scale.set(1.3, 1.3, 1.3);
-      dummy.updateMatrix();
-      instancedMesh.setMatrixAt(hoveredInstanceId, dummy.matrix);
-      instancedMesh.instanceMatrix.needsUpdate = true;
-
-      // Crosshair feedback
-      crosshair.style.borderColor = "rgba(255, 255, 255, 1)";
-      crosshairDot.style.background = "rgba(255, 255, 255, 1)";
-
-      // Create halo
-      const haloMaterial = new THREE.MeshBasicMaterial({
-        color: data.color,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8,
-      });
-
-      halo = new THREE.Mesh(haloGeometry, haloMaterial);
-      halo.position.copy(data.position);
-      halo.lookAt(camera.position);
-      scene.add(halo);
-
-      console.log(`Hovering: ${data.title}`);
-    } else {
-      crosshair.style.borderColor = "rgba(135, 206, 235, 0.8)";
-      crosshairDot.style.background = "rgba(135, 206, 235, 0.8)";
-    }
-  }
-
-  // ===============================
-  // ANIMATION (SUBTLE PULSE)
-  // ===============================
-  let animationTime = 0;
-
-  function animateSpheres() {
-    animationTime += 0.005;
-
-    // Only animate a subset for performance (every 10th sphere)
-    for (let i = 0; i < 5000; i += 10) {
-      if (i === hoveredInstanceId) continue;
-
-      const data = sphereData[i];
-      const pulse = 1 + Math.sin(animationTime * 2 + i * 0.1) * 0.05;
-      
-      dummy.position.copy(data.position);
-      dummy.scale.set(pulse, pulse, pulse);
-      dummy.rotation.y = animationTime + i * 0.1;
-      dummy.updateMatrix();
-      instancedMesh.setMatrixAt(i, dummy.matrix);
-    }
-
-    instancedMesh.instanceMatrix.needsUpdate = true;
-
-    // Update halo
-    if (halo) {
-      halo.lookAt(camera.position);
-    }
-  }
-
-  // ===============================
-  // COUNT VISIBLE INSTANCES (FOR STATS)
-  // ===============================
-  function updateVisibleCount() {
-    // Approximate visible instances using frustum
-    const frustum = new THREE.Frustum();
-    const projScreenMatrix = new THREE.Matrix4();
-    projScreenMatrix.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
+  sphereData.push(p);
+  minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+  minZ=Math.min(minZ,p.z); maxZ=Math.max(maxZ,p.z);
+}
+
+////////////////////////////////////////////////////////////
+// BUILD CHUNKS
+////////////////////////////////////////////////////////////
+const chunks = new Map();
+const originX=minX, originZ=minZ;
+
+for(let i=0;i<sphereData.length;i++){
+  const p=sphereData[i];
+  const cx=Math.floor((p.x-originX)/CHUNK_SIZE);
+  const cz=Math.floor((p.z-originZ)/CHUNK_SIZE);
+  const key=`${cx},${cz}`;
+
+  if(!chunks.has(key)){
+    const min=new THREE.Vector3(
+      originX+cx*CHUNK_SIZE,-2000,
+      originZ+cz*CHUNK_SIZE
     );
-    frustum.setFromProjectionMatrix(projScreenMatrix);
+    const max=new THREE.Vector3(
+      originX+(cx+1)*CHUNK_SIZE,2000,
+      originZ+(cz+1)*CHUNK_SIZE
+    );
+    chunks.set(key,{
+      center:new THREE.Vector3(
+        (min.x+max.x)/2,0,(min.z+max.z)/2
+      ),
+      bbox:new THREE.Box3(min,max),
+      indices:[],
+      lod:{},
+      currentLOD:null
+    });
+  }
+  chunks.get(key).indices.push(i);
+}
 
-    let visibleCount = 0;
-    const sphere = new THREE.Sphere();
-    
-    for (let i = 0; i < 5000; i++) {
-      sphere.center.copy(sphereData[i].position);
-      sphere.radius = 8;
-      
-      if (frustum.intersectsSphere(sphere)) {
-        visibleCount++;
+////////////////////////////////////////////////////////////
+// BUILD CHUNK LOD MESHES (ONCE)
+////////////////////////////////////////////////////////////
+const dummy=new THREE.Object3D();
+
+for(const chunk of chunks.values()){
+  for(const level of ["HIGH","MID","LOW"]){
+    const mesh=new THREE.InstancedMesh(
+      GEOMETRY[level], MATERIAL, chunk.indices.length
+    );
+    mesh.visible=false;
+    mesh.frustumCulled=false;
+
+    for(let i=0;i<chunk.indices.length;i++){
+      dummy.position.copy(sphereData[chunk.indices[i]]);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i,dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate=true;
+    scene.add(mesh);
+    chunk.lod[level]=mesh;
+  }
+}
+
+////////////////////////////////////////////////////////////
+// FRUSTUM / LOD LOGIC
+////////////////////////////////////////////////////////////
+const frustum=new THREE.Frustum();
+const proj=new THREE.Matrix4();
+
+function pickLOD(d){
+  if(d<LOD_DIST.HIGH) return "HIGH";
+  if(d<LOD_DIST.MID)  return "MID";
+  return "LOW";
+}
+
+function updateChunks(){
+  proj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
+  frustum.setFromProjectionMatrix(proj);
+
+  let visible=0;
+
+  for(const chunk of chunks.values()){
+    const inView=frustum.intersectsBox(chunk.bbox) &&
+                 camera.position.distanceTo(chunk.center)<=RENDER_DIST;
+
+    if(!inView){
+      if(chunk.currentLOD){
+        chunk.lod[chunk.currentLOD].visible=false;
+        chunk.currentLOD=null;
       }
+      continue;
     }
 
-    performanceStats.visibleDots = visibleCount;
+    const d=camera.position.distanceTo(chunk.center);
+    const desired=pickLOD(d);
+
+    if(chunk.currentLOD!==desired){
+      if(chunk.currentLOD)
+        chunk.lod[chunk.currentLOD].visible=false;
+      chunk.lod[desired].visible=true;
+      chunk.currentLOD=desired;
+    }
+
+    visible+=chunk.indices.length;
   }
 
-  // ===============================
-  // MAIN ANIMATION LOOP
-  // ===============================
-  function animate() {
-    requestAnimationFrame(animate);
-    
-    movePlayer();
-    handleHover();
-    animateSpheres();
-    updateVisibleCount();
-    updatePerformanceDisplay();
-    updateMinimap();
-    
-    renderer.render(scene, camera);
+  hud.innerHTML=
+    `FPS: ${fps}<br>`+
+    `Visible: ${visible}/${TOTAL_SPHERES}<br>`+
+    `Cam: ${camera.position.x.toFixed(0)},${camera.position.y.toFixed(0)},${camera.position.z.toFixed(0)}`;
+}
+
+////////////////////////////////////////////////////////////
+// MOVEMENT (SAFE)
+////////////////////////////////////////////////////////////
+let rotX=0,rotY=0;
+const keys={};
+
+document.body.onclick=()=>document.body.requestPointerLock();
+document.addEventListener("mousemove",e=>{
+  if(document.pointerLockElement!==document.body) return;
+  rotY-=e.movementX*0.002;
+  rotX-=e.movementY*0.002;
+  rotX=Math.max(-Math.PI/2,Math.min(Math.PI/2,rotX));
+  camera.rotation.order="YXZ";
+  camera.rotation.set(rotX,rotY,0);
+});
+
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
+
+function move(){
+  const dir=new THREE.Vector3();
+  const f=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const r=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+  if(keys.KeyW) dir.add(f);
+  if(keys.KeyS) dir.sub(f);
+  if(keys.KeyD) dir.add(r);
+  if(keys.KeyA) dir.sub(r);
+  if(dir.lengthSq()>0){
+    dir.normalize();
+    camera.position.addScaledVector(dir,15);
   }
+}
 
-  animate();
+////////////////////////////////////////////////////////////
+// LOOP
+////////////////////////////////////////////////////////////
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now();
+  fps=Math.round(1000/(now-lastTime));
+  lastTime=now;
 
-  // ===============================
-  // RESIZE HANDLER
-  // ===============================
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  move();
+  updateChunks();
+  renderer.render(scene,camera);
+}
+loop();
 
-  // ===============================
-  // OPTIMIZATION SUMMARY LOGGED
-  // ===============================
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🎉 OPTIMIZATION COMPLETE!');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('BEFORE:');
-  console.log('  • 5,000 individual meshes');
-  console.log('  • 5,000 individual materials');
-  console.log('  • 5,000 individual sprites');
-  console.log('  • ~10,000 draw calls per frame');
-  console.log('  • ~500 MB memory usage');
-  console.log('  • ~30-40 FPS');
-  console.log('');
-  console.log('AFTER:');
-  console.log('  • 1 InstancedMesh (5000 instances)');
-  console.log('  • 1 shared material');
-  console.log('  • 1 Points object for glows');
-  console.log('  • 2 draw calls per frame');
-  console.log('  • ~5-10 MB memory usage');
-  console.log('  • 60+ FPS');
-  console.log('');
-  console.log('IMPROVEMENTS:');
-  console.log('  ✅ 98% memory reduction');
-  console.log('  ✅ 99.98% fewer draw calls');
-  console.log('  ✅ 50%+ FPS improvement');
-  console.log('  ✅ Automatic frustum culling');
-  console.log('  ✅ GPU-friendly data layout');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
 </script>
-
 </body>
 </html>
