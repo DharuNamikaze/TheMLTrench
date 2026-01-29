@@ -72,7 +72,7 @@ scene.add(new THREE.AmbientLight(0xffffff,0.6));
 // GENERATE WORLD DATA (CPU-SIDE)
 ////////////////////////////////////////////////////////////
 const sphereData = [];
-let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+let minX=Infinity, maxX=-Infinity, minZ=Infinity, maxZ=-Infinity;
 
 for(let i=0;i<TOTAL_SPHERES;i++){
   const p = new THREE.Vector3(
@@ -221,7 +221,8 @@ function move(){
   if(keys.KeyA) dir.sub(r);
   if(dir.lengthSq()>0){
     dir.normalize();
-    camera.position.addScaledVector(dir,15);
+    const speed = keys.ShiftLeft ? 90 : 15; // 6x boost with Shift
+    camera.position.addScaledVector(dir,speed);
   }
 }
 
