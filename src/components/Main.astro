@@ -74,7 +74,7 @@ canvas#webgl-renderer {
     60, // Field of view in degrees (reduced from 75 to 60 to reduce fisheye distortion)
     window.innerWidth / window.innerHeight, // Aspect ratio (width/height)
     0.1, // Near clipping plane (objects closer than this won't render)
-    5000, // Far clipping plane (objects farther than this won't render)
+    25000, // Far clipping plane (increased to match render distance + buffer)
   );
   camera.position.set(0, 0, 100); // Start camera at origin, 100 units forward
 
@@ -115,7 +115,8 @@ canvas#webgl-renderer {
   const sphereData = []; // Array to store metadata for all 1000 spheres
   const loadedSpheres = new Map(); // Map to track which spheres are currently loaded in the scene
   const geometry = new THREE.SphereGeometry(8, 16, 16); // Shared geometry for all spheres (radius=8, segments=16x16)
-  const RENDER_DISTANCE = 12500; // Only render spheres within 12500 units of camera (5x increased from 2500)
+  const RENDER_DISTANCE = 44000; // Load spheres within 20500 units of camera
+  const UNLOAD_DISTANCE = 44000; // Unload spheres beyond 24000 units (large buffer to keep entire clusters visible)
 
   // ===============================
   // PERFORMANCE TRACKING SYSTEM
@@ -140,14 +141,14 @@ canvas#webgl-renderer {
   top: 10px;
   left: 10px;
   background: rgba(0, 0, 0, 0.7);
-  color: #00ff88;
+  color: #fc6203;
   padding: 10px;
   font-family: 'Courier New', monospace;
   font-size: 11px;
   border-radius: 5px;
   z-index: 998;
   line-height: 1.4;
-  border: 1px solid rgba(0, 255, 136, 0.3);
+  border: 1px solid rgba(0, 255, 36, 0.3);
   max-width: 220px;
   backdrop-filter: blur(2px);
 `;
@@ -484,9 +485,12 @@ height: 150px;   // was: 1px                              /* Display height */
     sphereData.forEach((data) => {
       const distance = camera.position.distanceTo(data.position);
 
+      // Load dots within RENDER_DISTANCE
       if (distance < RENDER_DISTANCE && !loadedSpheres.has(data.index)) {
         loadDot(data);
-      } else if (distance >= RENDER_DISTANCE && loadedSpheres.has(data.index)) {
+      } 
+      // Unload dots beyond UNLOAD_DISTANCE (hysteresis prevents flickering)
+      else if (distance >= UNLOAD_DISTANCE && loadedSpheres.has(data.index)) {
         unloadDot(data.index);
       }
     });
