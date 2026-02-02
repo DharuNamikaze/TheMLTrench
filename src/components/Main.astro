@@ -4,312 +4,347 @@
 
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Clustered Regression World</title>
-<style>
-  body { margin:0; overflow:hidden; background:#000; }
-  #hud {
-    position:fixed; top:10px; left:10px;
-    color:#9ff; font-family:monospace;
-    background:rgba(0,0,0,.7);
-    padding:10px; font-size:11px;
-    border-radius:6px; z-index:10;
-  }
-  #crosshair {
-    position:fixed;
-    top:50%; left:50%;
-    transform:translate(-50%,-50%);
-    width:30px; height:30px;
-    border:2px solid rgba(135,206,235,0.8);
-    border-radius:50%;
-    pointer-events:none;
-    z-index:100;
-    transition:all 0.2s ease;
-  }
-  #crosshair::after {
-    content:'';
-    position:absolute;
-    top:50%; left:50%;
-    transform:translate(-50%,-50%);
-    width:4px; height:4px;
-    background:rgba(135,206,235,0.8);
-    border-radius:50%;
-    transition:all 0.2s ease;
-  }
-  #crosshair.active {
-    border-color:rgba(255,255,255,1);
-    width:40px; height:40px;
-    border-width:3px;
-  }
-  #crosshair.active::after {
-    width:6px; height:6px;
-    background:rgba(255,255,255,1);
-  }
-  #info {
-    position:fixed; bottom:10px; left:10px;
-    color:#9ff; font-family:monospace;
-    background:rgba(0,0,0,.8);
-    padding:12px; font-size:11px;
-    border-radius:6px; z-index:10;
-    max-width:300px;
-    display:none;
-    border:1px solid rgba(135,206,235,0.3);
-    animation:fadeIn 0.3s ease;
-  }
-  @keyframes fadeIn {
-    from { opacity:0; transform:translateY(10px); }
-    to { opacity:1; transform:translateY(0); }
-  }
-  @keyframes pulse {
-    0%, 100% { transform:scale(1); }
-    50% { transform:scale(1.05); }
-  }
-</style>
-</head>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Clustered Regression World</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      #hud {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        color: #9ff;
 
-<body>
-<div id="hud"></div>
-<div id="crosshair"></div>
-<div id="info"></div>
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        font-size: 11px;
+        border-radius: 6px;
+        z-index: 10;
+      }
+      #crosshair {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 30px;
+        height: 30px;
+        border: 2px solid rgba(135, 206, 235, 0.8);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 100;
+        transition: all 0.2s ease;
+      }
+      #crosshair::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 4px;
+        height: 4px;
+        background: rgba(135, 206, 235, 0.8);
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
+      #crosshair.active {
+        border-color: rgba(255, 255, 255, 1);
+        width: 40px;
+        height: 40px;
+        border-width: 3px;
+      }
+      #crosshair.active::after {
+        width: 6px;
+        height: 6px;
+        background: rgba(255, 255, 255, 1);
+      }
+      #info {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        color: #194;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 12px;
+        font-size: 11px;
+        border-radius: 6px;
+        z-index: 10;
+        max-width: 300px;
+        display: none;
+        border: 1px solid rgba(135, 206, 235, 0.3);
+        animation: fadeIn 0.3s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+    </style>
+  </head>
 
-<script type="module" is:inline>
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
+  <body>
+    <div id="hud"></div>
+    <div id="crosshair"></div>
+    <div id="info"></div>
 
-////////////////////////////////////////////////////////////
-// CONFIG (REAL REGRESSION)
-////////////////////////////////////////////////////////////
-const CLUSTERS = 80;
-const SPHERES_PER_CLUSTER = 125;
-const CHUNK_SIZE = 4000;
-const RENDER_DIST = 9000;
+    <script type="module" is:inline>
+      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
-// Regression coefficients (TUNE THESE)
-const REG = {
-  A: 800,   // radius growth
-  B: 250,   // base radius
-  C: 700,   // spacing
-  D: 450,   // vertical amp
-  E: 0.55   // vertical freq
-};
+      ////////////////////////////////////////////////////////////
+      // CONFIG (REAL REGRESSION)
+      ////////////////////////////////////////////////////////////
+      const CLUSTERS = 100;
+      const SPHERES_PER_CLUSTER = 100;
+      const CHUNK_SIZE = 4000;
+      const RENDER_DIST = 9000;
 
-////////////////////////////////////////////////////////////
-// SCENE
-////////////////////////////////////////////////////////////
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000000);
-
-const camera = new THREE.PerspectiveCamera(
-  60, innerWidth / innerHeight, 0.1, RENDER_DIST
-);
-camera.position.set(0,0,300);
-
-const renderer = new THREE.WebGLRenderer({ antialias:true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
-document.body.appendChild(renderer.domElement);
-
-////////////////////////////////////////////////////////////
-// HUD
-////////////////////////////////////////////////////////////
-const hud = document.getElementById("hud");
-const crosshair = document.getElementById("crosshair");
-const info = document.getElementById("info");
-let last = performance.now(), fps = 0;
-
-////////////////////////////////////////////////////////////
-// GEOMETRY (7/10 QUALITY)
-////////////////////////////////////////////////////////////
-const GEO = {
-  HIGH: new THREE.SphereGeometry(9,16,16),
-  MID:  new THREE.SphereGeometry(9,10,10),
-  LOW:  new THREE.SphereGeometry(9,6,6)
-};
-
-////////////////////////////////////////////////////////////
-// GENERATE CLUSTERS (REAL REGRESSION)
-////////////////////////////////////////////////////////////
-const clusters = [];
-for (let c = 0; c < CLUSTERS; c++) {
-  const radius = REG.A * Math.log(c + 1) + REG.B;
-  const dist   = REG.C * Math.sqrt(c);
-  const height = REG.D * Math.sin(c * REG.E);
-
-  const center = new THREE.Vector3(
-    Math.cos(c) * dist,
-    height,
-    Math.sin(c) * dist
-  );
-
-  const color = new THREE.Color(`hsl(${(c/CLUSTERS)*360}, 90%, 60%)`);
-
-  const points = [];
-  for (let i = 0; i < SPHERES_PER_CLUSTER; i++) {
-    const u = Math.random();
-    const v = Math.random();
-    const theta = u * 2 * Math.PI;
-    const phi = Math.acos(2*v - 1);
-    const r = Math.random() * radius;
-
-    points.push(
-      new THREE.Vector3(
-        center.x + r * Math.sin(phi) * Math.cos(theta),
-        center.y + r * Math.sin(phi) * Math.sin(theta),
-        center.z + r * Math.cos(phi)
-      )
-    );
-  }
-
-  clusters.push({ center, color, points });
-}
-
-////////////////////////////////////////////////////////////
-// CHUNKING
-////////////////////////////////////////////////////////////
-const chunks = new Map();
-let minX = Infinity, minZ = Infinity;
-
-clusters.forEach(c =>
-  c.points.forEach(p => {
-    minX = Math.min(minX, p.x);
-    minZ = Math.min(minZ, p.z);
-  })
-);
-
-clusters.forEach((cluster, ci) => {
-  cluster.points.forEach(p => {
-    const cx = Math.floor((p.x - minX) / CHUNK_SIZE);
-    const cz = Math.floor((p.z - minZ) / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    if (!chunks.has(key)) {
-      chunks.set(key, {
-        center: new THREE.Vector3(
-          minX + (cx + 0.5) * CHUNK_SIZE,
-          0,
-          minZ + (cz + 0.5) * CHUNK_SIZE
-        ),
-        clusters: new Map(),
-        current: null
-      });
-    }
-    if (!chunks.get(key).clusters.has(ci))
-      chunks.get(key).clusters.set(ci, []);
-    chunks.get(key).clusters.get(ci).push(p);
-  });
-});
-
-////////////////////////////////////////////////////////////
-// BUILD MESHES (ONE MATERIAL PER CLUSTER)
-////////////////////////////////////////////////////////////
-const dummy = new THREE.Object3D();
-const allMeshes = []; // Track all meshes for raycasting
-
-for (const chunk of chunks.values()) {
-  chunk.lod = { HIGH: [], MID: [], LOW: [] };
-
-  for (const [ci, points] of chunk.clusters.entries()) {
-    const col = clusters[ci].color;
-
-    const material = new THREE.MeshStandardMaterial({
-      color: col,
-      emissive: col,
-      emissiveIntensity: 0.8
-    });
-
-    for (const level of ["HIGH","MID","LOW"]) {
-      const mesh = new THREE.InstancedMesh(
-        GEO[level],
-        material,
-        points.length
-      );
-      mesh.visible = false;
-      mesh.frustumCulled = false;
-      
-      // Store metadata on the mesh itself
-      mesh.userData = {
-        clusterIndex: ci,
-        clusterColor: col,
-        points: points,
-        level: level
+      // Regression coefficients (TUNE THESE)
+      const REG = {
+        A: 800, // radius growth
+        B: 250, // base radius
+        C: 700, // spacing
+        D: 450, // vertical amp
+        E: 0.55, // vertical freq
       };
 
-      points.forEach((p,i) => {
-        dummy.position.copy(p);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(i, dummy.matrix);
+      ////////////////////////////////////////////////////////////
+      // SCENE
+      ////////////////////////////////////////////////////////////
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000000);
+
+      const camera = new THREE.PerspectiveCamera(
+        60,
+        innerWidth / innerHeight,
+        0.1,
+        RENDER_DIST,
+      );
+      camera.position.set(0, 0, 300);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      document.body.appendChild(renderer.domElement);
+
+      ////////////////////////////////////////////////////////////
+      // HUD
+      ////////////////////////////////////////////////////////////
+      const hud = document.getElementById("hud");
+      const crosshair = document.getElementById("crosshair");
+      const info = document.getElementById("info");
+      let last = performance.now(),
+        fps = 0;
+
+      ////////////////////////////////////////////////////////////
+      // GEOMETRY (7/10 QUALITY)
+      ////////////////////////////////////////////////////////////
+      const GEO = {
+        HIGH: new THREE.SphereGeometry(9, 16, 16),
+        MID: new THREE.SphereGeometry(9, 12, 12),
+        LOW: new THREE.SphereGeometry(9, 10, 10),
+      };
+
+      ////////////////////////////////////////////////////////////
+      // GENERATE CLUSTERS (Uniform Distribution )
+      ////////////////////////////////////////////////////////////
+      const clusters = [];
+      for (let c = 0; c < CLUSTERS; c++) {
+        const radius = REG.A * Math.log(c + 1) + REG.B;
+        const dist = REG.C * Math.sqrt(c);
+        const height = REG.D * Math.sin(c * REG.E);
+
+        const center = new THREE.Vector3(
+          Math.cos(c) * dist,
+          height,
+          Math.sin(c) * dist,
+        );
+
+        const color = new THREE.Color(`hsl(${(c / CLUSTERS) * 360}, 90%, 60%)`);
+
+        const points = [];
+        for (let i = 0; i < SPHERES_PER_CLUSTER; i++) {
+          const u = Math.random();
+          const v = Math.random();
+          const theta = u * 2 * Math.PI;
+          const phi = Math.acos(2 * v - 1);
+          const r = Math.random() * radius;
+
+          points.push(
+            new THREE.Vector3(
+              center.x + r * Math.sin(phi) * Math.cos(theta),
+              center.y + r * Math.sin(phi) * Math.sin(theta),
+              center.z + r * Math.cos(phi),
+            ),
+          );
+        }
+
+        clusters.push({ center, color, points });
+      }
+
+      ////////////////////////////////////////////////////////////
+      // CHUNKING
+      ////////////////////////////////////////////////////////////
+      const chunks = new Map();
+      let minX = Infinity,
+        minZ = Infinity;
+
+      clusters.forEach((c) =>
+        c.points.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          minZ = Math.min(minZ, p.z);
+        }),
+      );
+
+      clusters.forEach((cluster, ci) => {
+        cluster.points.forEach((p) => {
+          const cx = Math.floor((p.x - minX) / CHUNK_SIZE);
+          const cz = Math.floor((p.z - minZ) / CHUNK_SIZE);
+          const key = `${cx},${cz}`;
+          if (!chunks.has(key)) {
+            chunks.set(key, {
+              center: new THREE.Vector3(
+                minX + (cx + 0.5) * CHUNK_SIZE,
+                0,
+                minZ + (cz + 0.5) * CHUNK_SIZE,
+              ),
+              clusters: new Map(),
+              current: null,
+            });
+          }
+          if (!chunks.get(key).clusters.has(ci))
+            chunks.get(key).clusters.set(ci, []);
+          chunks.get(key).clusters.get(ci).push(p);
+        });
       });
 
-      mesh.instanceMatrix.needsUpdate = true;
-      scene.add(mesh);
-      chunk.lod[level].push(mesh);
-      allMeshes.push(mesh);
-    }
-  }
-}
+      ////////////////////////////////////////////////////////////
+      // BUILD MESHES (ONE MATERIAL PER CLUSTER)
+      ////////////////////////////////////////////////////////////
+      const dummy = new THREE.Object3D();
+      const allMeshes = []; // Track all meshes for raycasting
 
-////////////////////////////////////////////////////////////
-// RAYCASTING & SELECTION
-////////////////////////////////////////////////////////////
-const raycaster = new THREE.Raycaster();
-const centerMouse = new THREE.Vector2(0, 0); // Center of screen
-let selectedSphere = null;
+      for (const chunk of chunks.values()) {
+        chunk.lod = { HIGH: [], MID: [], LOW: [] };
 
-// Create highlight ring
-const ringGeometry = new THREE.RingGeometry(12, 15, 32);
-const ringMaterial = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  side: THREE.DoubleSide,
-  transparent: true,
-  opacity: 0.8
-});
-const highlightMesh = new THREE.Mesh(ringGeometry, ringMaterial);
-highlightMesh.visible = false;
-scene.add(highlightMesh);
+        for (const [ci, points] of chunk.clusters.entries()) {
+          const col = clusters[ci].color;
 
-function checkSelection() {
-  raycaster.setFromCamera(centerMouse, camera);
-  
-  // Only raycast against visible meshes
-  const visibleMeshes = allMeshes.filter(m => m.visible);
-  
-  if (visibleMeshes.length === 0) {
-    selectedSphere = null;
-    crosshair.style.borderColor = 'rgba(135,206,235,0.8)';
-    highlightMesh.visible = false;
-    info.style.display = 'none';
-    return;
-  }
-  
-  const intersects = raycaster.intersectObjects(visibleMeshes);
-  
-  if (intersects.length > 0) {
-    const hit = intersects[0];
-    const instanceId = hit.instanceId;
-    const mesh = hit.object;
-    const userData = mesh.userData;
-    
-    // Get sphere position from the points array
-    const spherePos = userData.points[instanceId];
-    
-    selectedSphere = {
-      position: spherePos,
-      clusterIndex: userData.clusterIndex,
-      sphereIndex: instanceId,
-      distance: camera.position.distanceTo(spherePos)
-    };
-    
-    // Update crosshair
-    crosshair.style.borderColor = 'rgba(255,255,255,1)';
-    
-    // Position highlight ring
-    highlightMesh.position.copy(spherePos);
-    highlightMesh.lookAt(camera.position);
-    highlightMesh.visible = true;
-    
-    // Update info panel
-    info.style.display = 'block';
-    info.innerHTML = `
+          const material = new THREE.MeshStandardMaterial({
+            color: col,
+            emissive: col,
+            emissiveIntensity: 0.8,
+          });
+
+          for (const level of ["HIGH", "MID", "LOW"]) {
+            const mesh = new THREE.InstancedMesh(
+              GEO[level],
+              material,
+              points.length,
+            );
+            mesh.visible = false;
+            mesh.frustumCulled = false;
+
+            // Store metadata on the mesh itself
+            mesh.userData = {
+              clusterIndex: ci,
+              clusterColor: col,
+              points: points,
+              level: level,
+            };
+
+            points.forEach((p, i) => {
+              dummy.position.copy(p);
+              dummy.updateMatrix();
+              mesh.setMatrixAt(i, dummy.matrix);
+            });
+
+            mesh.instanceMatrix.needsUpdate = true;
+            scene.add(mesh);
+            chunk.lod[level].push(mesh);
+            allMeshes.push(mesh);
+          }
+        }
+      }
+
+      ////////////////////////////////////////////////////////////
+      // RAYCASTING & SELECTION
+      ////////////////////////////////////////////////////////////
+      const raycaster = new THREE.Raycaster();
+      const centerMouse = new THREE.Vector2(0, 0); // Center of screen
+      let selectedSphere = null;
+
+      // Create highlight ring
+      const ringGeometry = new THREE.RingGeometry(12, 15, 32);
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8,
+      });
+      const highlightMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+      highlightMesh.visible = false;
+      scene.add(highlightMesh);
+
+      function checkSelection() {
+        raycaster.setFromCamera(centerMouse, camera);
+
+        // Only raycast against visible meshes
+        const visibleMeshes = allMeshes.filter((m) => m.visible);
+
+        if (visibleMeshes.length === 0) {
+          selectedSphere = null;
+          crosshair.style.borderColor = "rgba(135,206,235,0.8)";
+          highlightMesh.visible = false;
+          info.style.display = "none";
+          return;
+        }
+
+        const intersects = raycaster.intersectObjects(visibleMeshes);
+
+        if (intersects.length > 0) {
+          const hit = intersects[0];
+          const instanceId = hit.instanceId;
+          const mesh = hit.object;
+          const userData = mesh.userData;
+
+          // Get sphere position from the points array
+          const   spherePos = userData.points[instanceId];
+
+          selectedSphere = {
+            position: spherePos,
+            clusterIndex: userData.clusterIndex,
+            sphereIndex: instanceId,
+            distance: camera.position.distanceTo(spherePos),
+          };
+
+          // Update crosshair
+          crosshair.style.borderColor = "rgb(255,255,255)";
+
+          // Position highlight ring
+          highlightMesh.position.copy(spherePos);
+          highlightMesh.lookAt(camera.position);
+          highlightMesh.visible = true;
+
+          // Update info panel
+          info.style.display = "block";
+          info.innerHTML = ` 
       <strong>SPHERE SELECTED</strong><br>
       Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
       Sphere: ${selectedSphere.sphereIndex + 1}<br>
@@ -317,103 +352,107 @@ function checkSelection() {
       Distance: ${selectedSphere.distance.toFixed(0)} units<br>
       LOD: ${userData.level}
     `;
-  } else {
-    selectedSphere = null;
-    crosshair.style.borderColor = 'rgba(135,206,235,0.8)';
-    highlightMesh.visible = false;
-    info.style.display = 'none';
-  }
-}
+        } else {
+          selectedSphere = null;
+          crosshair.style.borderColor = "rgba(135,206,235,0.8)";
+          highlightMesh.visible = false;
+          info.style.display = "none";
+        }
+      }
 
-////////////////////////////////////////////////////////////
-// LOD + VISIBILITY
-////////////////////////////////////////////////////////////
-function pickLOD(d){
-  if(d < 900) return "HIGH";
-  if(d < 3500) return "MID";
-  return "LOW";
-}
+      ////////////////////////////////////////////////////////////
+      // LOD + VISIBILITY
+      ////////////////////////////////////////////////////////////
+      function pickLOD(d) {
+        if (d < 900) return "HIGH";
+        if (d < 3500) return "MID";
+        return "LOW";
+      }
 
-function update(){
-  let visible = 0;
+      function update() {
+        let visible = 0;
 
-  for (const chunk of chunks.values()) {
-    const d = camera.position.distanceTo(chunk.center);
-    if (d > RENDER_DIST) {
-      if (chunk.current)
-        chunk.lod[chunk.current].forEach(m => m.visible=false);
-      chunk.current = null;
-      continue;
-    }
+        for (const chunk of chunks.values()) {
+          const d = camera.position.distanceTo(chunk.center);
+          if (d > RENDER_DIST) {
+            if (chunk.current)
+              chunk.lod[chunk.current].forEach((m) => (m.visible = false));
+            chunk.current = null;
+            continue;
+          }
 
-    const l = pickLOD(d);
-    if (chunk.current !== l) {
-      if (chunk.current)
-        chunk.lod[chunk.current].forEach(m => m.visible=false);
-      chunk.lod[l].forEach(m => m.visible=true);
-      chunk.current = l;
-    }
+          const l = pickLOD(d);
+          if (chunk.current !== l) {
+            if (chunk.current)
+              chunk.lod[chunk.current].forEach((m) => (m.visible = false));
+            chunk.lod[l].forEach((m) => (m.visible = true));
+            chunk.current = l;
+          }
 
-    chunk.lod[l].forEach(m => visible += m.count);
-  }
+          chunk.lod[l].forEach((m) => (visible += m.count));
+        }
 
-  hud.innerHTML = `FPS: ${fps}<br>Visible: ${visible}`;
-}
+        hud.innerHTML = `FPS: ${fps}<br>Visible: ${visible}`;
+      }
 
-////////////////////////////////////////////////////////////
-// MOVEMENT
-////////////////////////////////////////////////////////////
-let rx=0, ry=0;
-const keys = {};
+      ////////////////////////////////////////////////////////////
+      // MOVEMENT
+      ////////////////////////////////////////////////////////////
+      let rx = 0,
+        ry = 0;
+      const keys = {};
 
-document.body.onclick=()=>document.body.requestPointerLock();
+      document.body.onclick = () => document.body.requestPointerLock();
 
-addEventListener("mousemove",e=>{
-  if(document.pointerLockElement!==document.body) return;
-  ry -= e.movementX * 0.002;
-  rx -= e.movementY * 0.002;
-  rx = Math.max(-Math.PI/2, Math.min(Math.PI/2, rx));
-  camera.rotation.order="YXZ";
-  camera.rotation.set(rx, ry, 0);
-});
+      addEventListener("mousemove", (e) => {
+        if (document.pointerLockElement !== document.body) return;
+        ry -= e.movementX * 0.002;
+        rx -= e.movementY * 0.002;
+        rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rx));
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(rx, ry, 0);
+      });
 
-addEventListener("keydown",e=>keys[e.code]=true);
-addEventListener("keyup",e=>keys[e.code]=false);
+      addEventListener("keydown", (e) => (keys[e.code] = true));
+      addEventListener("keyup", (e) => (keys[e.code] = false));
 
-function move(){
-  const dir = new THREE.Vector3();
-  const f = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  const r = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
-  if(keys.KeyW) dir.add(f);
-  if(keys.KeyS) dir.sub(f);
-  if(keys.KeyD) dir.add(r);
-  if(keys.KeyA) dir.sub(r);
-  if(dir.lengthSq()>0){
-    dir.normalize();
-    camera.position.addScaledVector(dir, keys.ShiftLeft ? 80 : 16);
-  }
-}
+      function move() {
+        const dir = new THREE.Vector3();
+        const f = new THREE.Vector3(0, 0, -1).applyQuaternion(
+          camera.quaternion,
+        );
+        const r = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        if (keys.KeyW | keys.ArrowUp) dir.add(f);
+        if (keys.KeyS | keys.ArrowDown) dir.sub(f);
+        if (keys.KeyD | keys.ArrowRight) dir.add(r);
+        if (keys.KeyA | keys.ArrowLeft) dir.sub(r);
 
-////////////////////////////////////////////////////////////
-// LOOP
-////////////////////////////////////////////////////////////
-function loop(){
-  requestAnimationFrame(loop);
-  const now = performance.now();
-  fps = Math.round(1000/(now-last));
-  last = now;
-  move();
-  update();
-  checkSelection(); // Check for sphere under crosshair
-  renderer.render(scene, camera);
-}
-loop();
+        if (dir.lengthSq() > 0) {
+          dir.normalize();
+          camera.position.addScaledVector(dir, keys.ShiftLeft ? 80 : 16);
+        }
+      }
 
-addEventListener("resize",()=>{
-  camera.aspect = innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-});
-</script>
-</body>
+      ////////////////////////////////////////////////////////////
+      // LOOP
+      ////////////////////////////////////////////////////////////
+      function loop() {
+        requestAnimationFrame(loop);
+        const now = performance.now();
+        fps = Math.round(1000 / (now - last));
+        last = now;
+        move();
+        update();
+        checkSelection(); // Check for sphere under crosshair
+        renderer.render(scene, camera);
+      }
+      loop();
+
+      addEventListener("resize", () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+    </script>
+  </body>
 </html>
