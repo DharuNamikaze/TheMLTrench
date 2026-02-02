@@ -1,5 +1,4 @@
 ---
-import { Image } from 'astro:assets';
 /* Client-only Three.js clustered world */
 ---
 
@@ -24,6 +23,7 @@ import { Image } from 'astro:assets';
         font-size: small;
         border-radius: 6px;
         z-index: 10;
+        transition: opacity 0.5s ease;
       }
       #crosshair {
         position: fixed;
@@ -36,7 +36,7 @@ import { Image } from 'astro:assets';
         border-radius: 50%;
         pointer-events: none;
         z-index: 100;
-        transition: all 0.2s ease;
+        transition: all 0.5s ease;
       }
       #crosshair::after {
         content: "";
@@ -69,11 +69,8 @@ import { Image } from 'astro:assets';
         left: 0;
         right: 0; /* Sets top, right, bottom, and left to 0 */
         margin: auto; /* Centers it within that 0-offset space */
-
         width: max-content; /* Required so it doesn't stretch to full screen */
         height: fit-content;
-
-        /* Rest of your styles */
         color: #fff;
         text-align: center;
         background: rgba(0, 0, 0, 0.8);
@@ -85,14 +82,14 @@ import { Image } from 'astro:assets';
         display: none;
         border: 1px solid rgba(135, 206, 235, 0.3);
         animation: fadeIn 0.3s ease;
+        transition: opacity 0.5s ease;
       }
-      #controls{
-        position:fixed;
-        top:0;
-        bottom:10%;
-        left:10%;
-        right:0;
-
+      #controls {
+        position: fixed;
+        top: 0;
+        bottom: 10%;
+        left: 10%;
+        right: 0;
       }
       @keyframes fadeIn {
         from {
@@ -120,17 +117,21 @@ import { Image } from 'astro:assets';
     <div id="hud"></div>
     <div id="crosshair"></div>
     <div id="info"></div>
-    <div id="controls">
-      <Image src=`/favicon.svg` width={100} height={100} alt="Hi"/>
-      
+    <div id="help">
+      <div class="controls">
+        <span>W / &#8593; -  Move forward</span>
+        <span>A / &#8592; -  Move forward</span>
+        <span>S / &#8594; -  Move forward</span>
+        <span>D / &#8595; -  Move Right</span>
+      </div>
     </div>
 
     <script type="module" is:inline>
       import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
-      //////////////////////////////////////////////////////////// 
+      ////////////////////////////////////////////////////////////
       // CONFIG (REAL REGRESSION)
-      //////////////////////////////////////////////////////////// 
+      ////////////////////////////////////////////////////////////
       const CLUSTERS = 100;
       const SPHERES_PER_CLUSTER = 100;
       const CHUNK_SIZE = 5000;
@@ -369,11 +370,11 @@ import { Image } from 'astro:assets';
       <strong>SPHERE SELECTED</strong><br>
 
     `;
-      //     Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
-      // Sphere: ${selectedSphere.sphereIndex + 1}<br>
-      // Position: (${spherePos.x.toFixed(0)}, ${spherePos.y.toFixed(0)}, ${spherePos.z.toFixed(0)})<br>
-      // Distance: ${selectedSphere.distance.toFixed(0)} units<br>
-      // LOD: ${userData.level}
+          //     Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
+          // Sphere: ${selectedSphere.sphereIndex + 1}<br>
+          // Position: (${spherePos.x.toFixed(0)}, ${spherePos.y.toFixed(0)}, ${spherePos.z.toFixed(0)})<br>
+          // Distance: ${selectedSphere.distance.toFixed(0)} units<br>
+          // LOD: ${userData.level}
         } else {
           selectedSphere = null;
           crosshair.style.borderColor = "rgba(135,206,235,0.8)";
@@ -418,58 +419,161 @@ import { Image } from 'astro:assets';
       }
 
       ////////////////////////////////////////////////////////////
-      // MOVEMENT
+      // CONFIG
       ////////////////////////////////////////////////////////////
-      let rx = 0,
-        ry = 0;
-      const keys = {};
+      const CONFIG = {
+        mouseSensitivity: 0.002,
+        walkSpeed: 16,
+        sprintSpeed: 80,
+        afkTimeout: 15000, // ms (15 seconds)
+      };
 
-      document.body.onclick = () => document.body.requestPointerLock();
+      ////////////////////////////////////////////////////////////
+      // STATE
+      ////////////////////////////////////////////////////////////
+      let rx = 0;
+      let ry = 0;
+      let lastInputTime = performance.now();
+      let isAFK = false;
+      let afkTime = 0;
 
-      addEventListener("mousemove", (e) => {
-        if (document.pointerLockElement !== document.body) return;
-        ry -= e.movementX * 0.002;
-        rx -= e.movementY * 0.002;
-        rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rx));
-        camera.rotation.order = "YXZ";
-        camera.rotation.set(rx, ry, 0);
-      });
+      const keys = Object.create(null);
 
-      addEventListener("keydown", (e) => (keys[e.code] = true));
-      addEventListener("keyup", (e) => (keys[e.code] = false));
+      ////////////////////////////////////////////////////////////
+      // REUSABLE VECTORS (NO GC)
+      ////////////////////////////////////////////////////////////
+      const VEC = {
+        dir: new THREE.Vector3(),
+        forward: new THREE.Vector3(),
+        right: new THREE.Vector3(),
+      };
 
-      function move() {
-        const dir = new THREE.Vector3();
-        const f = new THREE.Vector3(0, 0, -1).applyQuaternion(
-          camera.quaternion,
-        );
-        const r = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        if (keys.KeyW | keys.ArrowUp) dir.add(f);
-        if (keys.KeyS | keys.ArrowDown) dir.sub(f);
-        if (keys.KeyD | keys.ArrowRight) dir.add(r);
-        if (keys.KeyA | keys.ArrowLeft) dir.sub(r);
-
-        if (dir.lengthSq() > 0) {
-          dir.normalize();
-          camera.position.addScaledVector(dir, keys.ShiftLeft ? 80 : 16);
+      ////////////////////////////////////////////////////////////
+      // INPUT ACTIVITY
+      ////////////////////////////////////////////////////////////
+      function registerActivity() {
+        lastInputTime = performance.now();
+        if (isAFK) {
+          isAFK = false;
+          afkTime = 0;
         }
       }
 
       ////////////////////////////////////////////////////////////
-      // LOOP
+      // AFK CAMERA
       ////////////////////////////////////////////////////////////
-      function loop() {
+      function updateAFKCamera(dt) {
+        afkTime += dt * 0.001;
+
+        // Smooth rotation (reduced speed)
+        ry += 0.000003 * dt;
+        rx = Math.sin(afkTime * 0.03) * 0.03;
+
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(rx, ry, 0);
+
+        // Direction vectors
+        VEC.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+        VEC.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+
+        // Drift (reduced movement speed)
+        VEC.dir
+          .copy(VEC.forward)
+          .addScaledVector(VEC.right, Math.sin(afkTime * 0.05) * 0.03)
+          .normalize();
+
+        camera.position.addScaledVector(VEC.dir, 0.0000001 * dt * 0.01);
+      }
+
+      ////////////////////////////////////////////////////////////
+      // MANUAL MOVEMENT
+      ////////////////////////////////////////////////////////////
+      function move(dt) {
+        VEC.dir.set(0, 0, 0);
+
+        VEC.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+        VEC.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+
+        if (keys.KeyW || keys.ArrowUp) VEC.dir.add(VEC.forward);
+        if (keys.KeyS || keys.ArrowDown) VEC.dir.sub(VEC.forward);
+        if (keys.KeyD || keys.ArrowRight) VEC.dir.add(VEC.right);
+        if (keys.KeyA || keys.ArrowLeft) VEC.dir.sub(VEC.right);
+
+        if (VEC.dir.lengthSq() > 0) {
+          VEC.dir.normalize();
+          const speed = keys.ShiftLeft ? CONFIG.sprintSpeed : CONFIG.walkSpeed;
+          camera.position.addScaledVector(VEC.dir, speed);
+        }
+      }
+
+      ////////////////////////////////////////////////////////////
+      // INPUT HANDLERS
+      ////////////////////////////////////////////////////////////
+      document.body.onclick = () => {
+        document.body.requestPointerLock();
+        registerActivity();
+      };
+
+      addEventListener("mousemove", (e) => {
+        if (document.pointerLockElement !== document.body) return;
+
+        registerActivity();
+        if (isAFK) return;
+
+        ry -= e.movementX * CONFIG.mouseSensitivity;
+        rx -= e.movementY * CONFIG.mouseSensitivity;
+
+        rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rx));
+
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(rx, ry, 0);
+      });
+
+      addEventListener("keydown", (e) => {
+        keys[e.code] = true;
+        registerActivity();
+      });
+
+      addEventListener("keyup", (e) => {
+        keys[e.code] = false;
+        registerActivity();
+      });
+
+      ////////////////////////////////////////////////////////////
+      // MAIN LOOP
+      ////////////////////////////////////////////////////////////
+      function loop(now = performance.now()) {
         requestAnimationFrame(loop);
-        const now = performance.now();
-        fps = Math.round(1000 / (now - last));
+
+        const dt = now - last;
         last = now;
-        move();
+
+        isAFK = now - lastInputTime > CONFIG.afkTimeout;
+
+        // Toggle UI visibility based on AFK state
+        if (isAFK) {
+          hud.style.opacity = '0';
+          crosshair.style.opacity = '0';
+          info.style.opacity = '0';
+          highlightMesh.visible = false;
+          updateAFKCamera(dt);
+        } else {
+          hud.style.opacity = '1';
+          crosshair.style.opacity = '1';
+          info.style.opacity = '1';
+          move(dt);
+        }
+
         update();
-        checkSelection(); // Check for sphere under crosshair
+        if (!isAFK) checkSelection(); // Only check selection when not AFK
         renderer.render(scene, camera);
       }
+
       loop();
 
+      ////////////////////////////////////////////////////////////
+      // RESIZE
+      ////////////////////////////////////////////////////////////
       addEventListener("resize", () => {
         camera.aspect = innerWidth / innerHeight;
         camera.updateProjectionMatrix();
