@@ -1,4 +1,5 @@
 ---
+import {Image } from 'astro:assets'
 /* Client-only Three.js clustered world */
 ---
 
@@ -73,16 +74,13 @@
         height: fit-content;
         color: #fff;
         text-align: center;
-        background: rgba(0, 0, 0, 0.8);
         padding: 12px;
         font-size: 20px;
-        border-radius: 6px;
         z-index: 10;
         min-width: 500px;
         display: none;
-        border: 1px solid rgba(135, 206, 235, 0.3);
-        animation: fadeIn 0.3s ease;
-        transition: opacity 0.5s ease;
+        animation: fadeIn 0.7s ease-in;
+        transition: opacity 0.7s ease-in;
       }
       #controls {
         position: fixed;
@@ -90,7 +88,121 @@
         bottom: 10%;
         left: 10%;
         right: 0;
+        color:#fff;
+        background-color: bisque;
+        width: 100px;
+        height: 100px;
+        z-index:100;
       }
+      
+      #help {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        color: #fff;
+        font-weight: 600;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 12px 20px;
+        border-radius: 8px;
+        border: 1px solid rgba(135, 206, 235, 0.3);
+        z-index: 10;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        font-size: 14px;
+        font-family: monospace;
+      }
+      
+      #help:hover {
+        background: rgba(0, 0, 0, 0.85);
+        border-color: rgba(135, 206, 235, 0.6);
+        transform: translateY(-2px);
+      }
+      
+      #modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        backdrop-filter: blur(5px);
+      }
+      
+      #modal.show {
+        display: flex;
+      }
+      
+      .modal-content {
+        background: rgba(10, 10, 10, 0.95);
+        border: 1px solid rgba(135, 206, 235, 0.4);
+        border-radius: 12px;
+        padding: 30px 40px;
+        max-width: 500px;
+        width: 90%;
+        color: #fff;
+        position: relative;
+        animation: modalSlideIn 0.3s ease;
+      }
+      
+      @keyframes modalSlideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      
+      .modal-close {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 28px;
+        color: rgba(135, 206, 235, 0.6);
+        cursor: pointer;
+        transition: color 0.2s ease;
+        background: none;
+        border: none;
+        line-height: 1;
+      }
+      
+      .modal-close:hover {
+        color: rgba(135, 206, 235, 1);
+      }
+      
+      .modal-content h2 {
+        margin: 0 0 20px 0;
+        font-size: 24px;
+        color: rgba(135, 206, 235, 1);
+        font-weight: 300;
+      }
+      
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      
+      .controls span {
+        font-size: 15px;
+        font-family: monospace;
+        padding: 8px 12px;
+        background: rgba(135, 206, 235, 0.05);
+        border-left: 2px solid rgba(135, 206, 235, 0.3);
+        border-radius: 4px;
+      }
+      
+      .controls span strong {
+        color: rgba(135, 206, 235, 0.9);
+        margin-right: 8px;
+      }
+
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -117,12 +229,22 @@
     <div id="hud"></div>
     <div id="crosshair"></div>
     <div id="info"></div>
-    <div id="help">
-      <div class="controls">
-        <span>W / &#8593; -  Move forward</span>
-        <span>A / &#8592; -  Move forward</span>
-        <span>S / &#8594; -  Move forward</span>
-        <span>D / &#8595; -  Move Right</span>
+    <div id="help">? Help</div>
+    
+    <div id="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <h2>Controls</h2>
+        <div class="controls">
+          <span><strong>W / ↑</strong> Move Forward</span>
+          <span><strong>S / ↓</strong> Move Backward</span>
+          <span><strong>A / ←</strong> Move Left</span>
+          <span><strong>D / →</strong> Move Right</span>
+          <span><strong>Shift</strong> Sprint </span>
+          <span><strong>Mouse</strong> Look around</span>
+          <span><strong>Click</strong> Lock pointer</span>
+          <span><strong>ESC</strong> Release pointer</span>
+        </div>
       </div>
     </div>
 
@@ -171,8 +293,36 @@
       const hud = document.getElementById("hud");
       const crosshair = document.getElementById("crosshair");
       const info = document.getElementById("info");
+      const help = document.getElementById("help");
+      const modal = document.getElementById("modal");
+      const modalClose = document.querySelector(".modal-close");
       let last = performance.now(),
         fps = 0;
+      
+      ////////////////////////////////////////////////////////////
+      // MODAL HANDLERS
+      ////////////////////////////////////////////////////////////
+      help.addEventListener("click", () => {
+        modal.classList.add("show");
+        registerActivity();
+      });
+      
+      modalClose.addEventListener("click", () => {
+        modal.classList.remove("show");
+      });
+      
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.remove("show");
+        }
+      });
+      
+      addEventListener("keydown", (e) => {
+        if (e.code === "Escape" && modal.classList.contains("show")) {
+          modal.classList.remove("show");
+          e.stopPropagation();
+        }
+      });
 
       ////////////////////////////////////////////////////////////
       // GEOMETRY (7/10 QUALITY)
@@ -425,7 +575,7 @@
         mouseSensitivity: 0.002,
         walkSpeed: 16,
         sprintSpeed: 80,
-        afkTimeout: 15000, // ms (15 seconds)
+        afkTimeout: 1500000000, // ms (15 seconds)
       };
 
       ////////////////////////////////////////////////////////////
@@ -509,7 +659,11 @@
       ////////////////////////////////////////////////////////////
       // INPUT HANDLERS
       ////////////////////////////////////////////////////////////
-      document.body.onclick = () => {
+      document.body.onclick = (e) => {
+        // Don't lock pointer if clicking on help button or modal
+        if (e.target.closest('#help') || e.target.closest('#modal')) {
+          return;
+        }
         document.body.requestPointerLock();
         registerActivity();
       };
@@ -555,12 +709,14 @@
           hud.style.opacity = '0';
           crosshair.style.opacity = '0';
           info.style.opacity = '0';
+          help.style.opacity = '0';
           highlightMesh.visible = false;
           updateAFKCamera(dt);
         } else {
           hud.style.opacity = '1';
           crosshair.style.opacity = '1';
           info.style.opacity = '1';
+          help.style.opacity = '1';
           move(dt);
         }
 
