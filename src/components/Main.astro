@@ -1,4 +1,5 @@
 ---
+import { Image } from 'astro:assets';
 /* Client-only Three.js clustered world */
 ---
 
@@ -18,11 +19,9 @@
         position: fixed;
         top: 10px;
         left: 10px;
-        color: #9ff;
-
-        background: rgba(0, 0, 0, 0.7);
-        padding: 10px;
-        font-size: 11px;
+        color: #fff;
+        margin: 2 px;
+        font-size: small;
         border-radius: 6px;
         z-index: 10;
       }
@@ -33,7 +32,7 @@
         transform: translate(-50%, -50%);
         width: 30px;
         height: 30px;
-        border: 2px solid rgba(135, 206, 235, 0.8);
+        border: 2px solid rgba(255, 255, 235, 1);
         border-radius: 50%;
         pointer-events: none;
         z-index: 100;
@@ -47,7 +46,7 @@
         transform: translate(-50%, -50%);
         width: 4px;
         height: 4px;
-        background: rgba(135, 206, 235, 0.8);
+        background: rgba(255, 255, 255, 1);
         border-radius: 50%;
         transition: all 0.2s ease;
       }
@@ -64,18 +63,36 @@
       }
       #info {
         position: fixed;
-        bottom: 10px;
-        left: 10px;
-        color: #194;
+        /* Remove bottom and left */
+        top: 20%;
+        bottom: 80%;
+        left: 0;
+        right: 0; /* Sets top, right, bottom, and left to 0 */
+        margin: auto; /* Centers it within that 0-offset space */
+
+        width: max-content; /* Required so it doesn't stretch to full screen */
+        height: fit-content;
+
+        /* Rest of your styles */
+        color: #fff;
+        text-align: center;
         background: rgba(0, 0, 0, 0.8);
         padding: 12px;
-        font-size: 11px;
+        font-size: 20px;
         border-radius: 6px;
         z-index: 10;
-        max-width: 300px;
+        min-width: 500px;
         display: none;
         border: 1px solid rgba(135, 206, 235, 0.3);
         animation: fadeIn 0.3s ease;
+      }
+      #controls{
+        position:fixed;
+        top:0;
+        bottom:10%;
+        left:10%;
+        right:0;
+
       }
       @keyframes fadeIn {
         from {
@@ -103,16 +120,20 @@
     <div id="hud"></div>
     <div id="crosshair"></div>
     <div id="info"></div>
+    <div id="controls">
+      <Image src=`/favicon.svg` width={100} height={100} alt="Hi"/>
+      
+    </div>
 
     <script type="module" is:inline>
       import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js";
 
-      ////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////// 
       // CONFIG (REAL REGRESSION)
-      ////////////////////////////////////////////////////////////
+      //////////////////////////////////////////////////////////// 
       const CLUSTERS = 100;
       const SPHERES_PER_CLUSTER = 100;
-      const CHUNK_SIZE = 4000;
+      const CHUNK_SIZE = 5000;
       const RENDER_DIST = 9000;
 
       // Regression coefficients (TUNE THESE)
@@ -190,7 +211,7 @@
             new THREE.Vector3(
               center.x + r * Math.sin(phi) * Math.cos(theta),
               center.y + r * Math.sin(phi) * Math.sin(theta),
-              center.z + r * Math.cos(phi),
+              center.z + r * Math.cos(theta * 9),
             ),
           );
         }
@@ -325,7 +346,7 @@
           const userData = mesh.userData;
 
           // Get sphere position from the points array
-          const   spherePos = userData.points[instanceId];
+          const spherePos = userData.points[instanceId];
 
           selectedSphere = {
             position: spherePos,
@@ -346,12 +367,13 @@
           info.style.display = "block";
           info.innerHTML = ` 
       <strong>SPHERE SELECTED</strong><br>
-      Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
-      Sphere: ${selectedSphere.sphereIndex + 1}<br>
-      Position: (${spherePos.x.toFixed(0)}, ${spherePos.y.toFixed(0)}, ${spherePos.z.toFixed(0)})<br>
-      Distance: ${selectedSphere.distance.toFixed(0)} units<br>
-      LOD: ${userData.level}
+
     `;
+      //     Cluster: ${selectedSphere.clusterIndex + 1}/${CLUSTERS}<br>
+      // Sphere: ${selectedSphere.sphereIndex + 1}<br>
+      // Position: (${spherePos.x.toFixed(0)}, ${spherePos.y.toFixed(0)}, ${spherePos.z.toFixed(0)})<br>
+      // Distance: ${selectedSphere.distance.toFixed(0)} units<br>
+      // LOD: ${userData.level}
         } else {
           selectedSphere = null;
           crosshair.style.borderColor = "rgba(135,206,235,0.8)";
@@ -392,7 +414,7 @@
           chunk.lod[l].forEach((m) => (visible += m.count));
         }
 
-        hud.innerHTML = `FPS: ${fps}<br>Visible: ${visible}`;
+        hud.innerHTML = `${fps} `;
       }
 
       ////////////////////////////////////////////////////////////
