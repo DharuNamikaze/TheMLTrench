@@ -296,8 +296,10 @@ import {Image } from 'astro:assets'
       const help = document.getElementById("help");
       const modal = document.getElementById("modal");
       const modalClose = document.querySelector(".modal-close");
-      let last = performance.now(),
-        fps = 0;
+      let last = performance.now();
+      let fps = 0;
+      let frameCount = 0;
+      let fpsUpdateTime = performance.now();
       
       ////////////////////////////////////////////////////////////
       // MODAL HANDLERS
@@ -575,7 +577,7 @@ import {Image } from 'astro:assets'
         mouseSensitivity: 0.002,
         walkSpeed: 16,
         sprintSpeed: 80,
-        afkTimeout: 1500000000, // ms (15 seconds)
+        afkTimeout: 10000, // ms (15 seconds)
       };
 
       ////////////////////////////////////////////////////////////
@@ -701,6 +703,14 @@ import {Image } from 'astro:assets'
 
         const dt = now - last;
         last = now;
+
+        // Update FPS counter every 500ms
+        frameCount++;
+        if (now - fpsUpdateTime >= 500) {
+          fps = Math.round((frameCount * 1000) / (now - fpsUpdateTime));
+          frameCount = 0;
+          fpsUpdateTime = now;
+        }
 
         isAFK = now - lastInputTime > CONFIG.afkTimeout;
 
