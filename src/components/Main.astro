@@ -1,949 +1,380 @@
----
-/* Client-only Three.js clustered world */
----
-
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Deep ML Space</title>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background: #000;
-      }
-      #hud {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        color: #fff;
-        margin: 2 px;
-        font-size: small;
-        border-radius: 6px;
-        z-index: 10;
-        transition: opacity 0.5s ease;
-      }
-      #crosshair {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 30px;
-        height: 30px;
-        border: 2px solid rgba(255, 255, 235, 1);
-        border-radius: 50%;
-        pointer-events: none;
-        z-index: 100;
-        transition: all 0.5s ease;
-      }
-      #crosshair::after {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 4px;
-        height: 4px;
-        background: rgba(255, 255, 255, 1);
-        border-radius: 50%;
-        transition: all 0.2s ease;
-      }
-      #crosshair.active {
-        border-color: rgba(255, 255, 255, 1);
-        width: 40px;
-        height: 40px;
-        border-width: 3px;
-      }
-      #crosshair.active::after {
-        width: 6px;
-        height: 6px;
-        background: rgba(255, 255, 255, 1);
-      }
-      #info {
-        position: fixed;
-        /* Remove bottom and left */
-        top: 20%;
-        bottom: 80%;
-        left: 0;
-        right: 0; /* Sets top, right, bottom, and left to 0 */
-        margin: auto; /* Centers it within that 0-offset space */
-        width: max-content; /* Required so it doesn't stretch to full screen */
-        height: fit-content;
-        color: #fff;
-        text-align: center;
-        padding: 12px;
-        font-size: 20px;
-        z-index: 10;
-        min-width: 500px;
-        display: none;
-        animation: fadeIn 0.7s ease-in;
-        transition: opacity 0.7s ease-in;
-      }
-      #controls {
-        position: fixed;
-        top: 0;
-        bottom: 10%;
-        left: 10%;
-        right: 0;
-        color: #fff;
-        background-color: bisque;
-        width: 100px;
-        height: 100px;
-        z-index: 100;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Deep ML Space</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#000; }
+    #hud { position:fixed; top:10px; left:10px; color:#fff; z-index:10; font-size:12px; }
+    #crosshair {
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:30px; height:30px; border:2px solid rgba(255,255,235,1);
+      border-radius:50%; pointer-events:none; z-index:100;
+    }
+    #crosshair::after {
+      content:""; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:4px; height:4px; background:#fff; border-radius:50%;
+    }
+    #info {
+      position:fixed; top:20%; left:0; right:0; margin:auto;
+      color:#fff; text-align:center; padding:12px; font-size:18px;
+      min-width:500px; display:none; z-index:10;
+    }
+    #help {
+      position:fixed; bottom:20px; right:20px; color:#fff; cursor:pointer;
+      background:rgba(0,0,0,.7); padding:10px 16px; border-radius:8px; z-index:10;
+      font-family:monospace; border:1px solid rgba(135,206,235,.3);
+    }
+    #modal {
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.85); z-index:1000;
+    }
+    #modal.show { display:flex; }
+    .modal-content {
+      background:rgba(10,10,10,.95); border:1px solid rgba(135,206,235,.4);
+      border-radius:12px; padding:30px 40px; color:#fff; position:relative;
+    }
+    .modal-close { position:absolute; top:12px; right:16px; font-size:26px; background:none; border:none; color:#87CEEB; cursor:pointer; }
+  </style>
+</head>
 
-      #help {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        color: #fff;
-        font-weight: 600;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 12px 20px;
-        border-radius: 8px;
-        border: 1px solid rgba(135, 206, 235, 0.3);
-        z-index: 10;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        font-size: 14px;
-        font-family: monospace;
-      }
+<body>
+  <div id="hud"></div>
+  <div id="crosshair"></div>
+  <div id="info"></div>
+  <div id="help">? Help</div>
+  <div style="position:fixed; top:10px; left:10px; color:#fff; font-size:26px; font-weight:700; z-index:10;">Deep ML Space</div>
 
-      #help:hover {
-        background: rgba(0, 0, 0, 0.85);
-        border-color: rgba(135, 206, 235, 0.6);
-        transform: translateY(-2px);
-      }
-
-      #modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-        backdrop-filter: blur(5px);
-      }
-
-      #modal.show {
-        display: flex;
-      }
-
-      .modal-content {
-        background: rgba(10, 10, 10, 0.95);
-        border: 1px solid rgba(135, 206, 235, 0.4);
-        border-radius: 12px;
-        padding: 30px 40px;
-        max-width: 500px;
-        width: 90%;
-        color: #fff;
-        position: relative;
-        animation: modalSlideIn 0.3s ease;
-      }
-
-      @keyframes modalSlideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .modal-close {
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 28px;
-        color: rgba(135, 206, 235, 0.6);
-        cursor: pointer;
-        transition: color 0.2s ease;
-        background: none;
-        border: none;
-        line-height: 1;
-      }
-
-      .modal-close:hover {
-        color: rgba(135, 206, 235, 1);
-      }
-
-      .modal-content h2 {
-        margin: 0 0 20px 0;
-        font-size: 24px;
-        color: rgba(135, 206, 235, 1);
-        font-weight: 300;
-      }
-
-      .controls {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .controls span {
-        font-size: 15px;
-        font-family: monospace;
-        padding: 8px 12px;
-        background: rgba(135, 206, 235, 0.05);
-        border-left: 2px solid rgba(135, 206, 235, 0.3);
-        border-radius: 4px;
-      }
-
-      .controls span strong {
-        color: rgba(135, 206, 235, 0.9);
-        margin-right: 8px;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      @keyframes pulse {
-        0%,
-        100% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.05);
-        }
-      }
-    </style>
-  </head>
-
-  <body>
-    <div style="position: fixed; top: 10px; left: 95%; z-index: 10; " id="hud">
-    </div>
-    <div id="crosshair"></div>
-    <div id="info"></div>
-    <div id="help">? Help</div>
-    <div
-      style="position: fixed; top: 10px; left: 10px; color: white; font-size: 26px; font-weight: 700; z-index: 10;"
-    >
-      Deep ML Space
-    </div>
-
-    <div id="modal">
-      <div class="modal-content">
-        <button class="modal-close">&times;</button>
-        <h2>Controls</h2>
-        <div class="controls">
-          <span><strong>W / ↑</strong> Move Forward</span>
-          <span><strong>S / ↓</strong> Move Backward</span>
-          <span><strong>A / ←</strong> Move Left</span>
-          <span><strong>D / →</strong> Move Right</span>
-          <span><strong>Shift</strong> Sprint </span>
-          <span><strong>Mouse</strong> Look around</span>
-          <span><strong>Click</strong> Lock pointer</span>
-          <span><strong>ESC</strong> Release pointer</span>
-        </div>
+  <div id="modal">
+    <div class="modal-content">
+      <button class="modal-close">&times;</button>
+      <h2>Controls</h2>
+      <div style="font-family:monospace; line-height:1.8">
+        <div><b>W/A/S/D</b> Move</div>
+        <div><b>Mouse</b> Look</div>
+        <div><b>Left Click</b> Next concept</div>
+        <div><b>Right Click</b> Previous concept</div>
+        <div><b>ESC</b> Release pointer</div>
       </div>
     </div>
+  </div>
 
-    <script>
-      import * as THREE from "three";
-      import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-      import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-      import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-      import { mlConcepts, zones } from "../../data/mlconcepts.js";
+  <script>
+    import * as THREE from "three";
+    import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+    import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+    import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+    import { mlConcepts, zones } from "../../data/mlconcepts.js";
 
-      ////////////////////////////////////////////////////////////
-      // CONFIG
-      ////////////////////////////////////////////////////////////
-      const SPHERES_PER_CONCEPT = 1; // One sphere per concept
-      const CHUNK_SIZE = 5000;
-      const RENDER_DIST = 12000;
+    // ===== CONFIG =====
+    const SPHERES_PER_CONCEPT = 1;
+    const CHUNK_SIZE = 5000;
+    const RENDER_DIST = 12000;
 
-      ////////////////////////////////////////////////////////////
-      // SCENE
-      ////////////////////////////////////////////////////////////
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x000000);
+    // ===== SCENE =====
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
 
-      const camera = new THREE.PerspectiveCamera(
-        60,
-        innerWidth / innerHeight,
-        0.1,
-        RENDER_DIST,
-      );
-      camera.position.set(0, 0, 300);
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, RENDER_DIST);
+    camera.position.set(0,0,300);
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(innerWidth, innerHeight);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-      document.body.appendChild(renderer.domElement);
+    const renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    document.body.appendChild(renderer.domElement);
 
-      ////////////////////////////////////////////////////////////
-      // POST-PROCESSING (BLOOM GLOW)
-      ////////////////////////////////////////////////////////////
-      const composer = new EffectComposer(renderer);
+    // ===== POST =====
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.3, 0.4, 0.85));
 
-      // Render pass - renders the scene
-      const renderPass = new RenderPass(scene, camera);
-      composer.addPass(renderPass);
+    // ===== UI =====
+    const hud = document.getElementById("hud")!;
+    const crosshair = document.getElementById("crosshair")!;
+    const info = document.getElementById("info")!;
+    const help = document.getElementById("help")!;
+    const modal = document.getElementById("modal")!;
+    const modalClose = document.querySelector(".modal-close")!;
 
-      // Bloom pass - creates the glow effect
-      const bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(innerWidth, innerHeight),
-        0.3, // strength (intensity of glow) - reduced
-        0.4, // radius (how far the glow spreads)
-        0.85, // threshold (minimum brightness to glow)
-      );
-      composer.addPass(bloomPass);
+    help.onclick = () => modal.classList.add("show");
+    modalClose.addEventListener("click", () => modal.classList.remove("show"));
+    modal.onclick = (e) => { if (e.target === modal) modal.classList.remove("show"); };
 
-      ////////////////////////////////////////////////////////////
-      // HUD
-      ////////////////////////////////////////////////////////////
-      const hud = document.getElementById("hud")!;
-      const crosshair = document.getElementById("crosshair")!;
-      const info = document.getElementById("info")!;
-      const help = document.getElementById("help")!;
-      const modal = document.getElementById("modal")!;
-      const modalClose = document.querySelector(".modal-close")!;
-      let last = performance.now();
-      let fps = 0;
-      let frameCount = 0;
-      let fpsUpdateTime = performance.now();
+    // disable browser menu for right click
+    addEventListener("contextmenu", (e) => e.preventDefault());
 
-      ////////////////////////////////////////////////////////////
-      // MODAL HANDLERS
-      ////////////////////////////////////////////////////////////
-      help.addEventListener("click", () => {
-        modal.classList.add("show");
-        registerActivity();
-      });
+    // ===== GEOMETRY =====
+    const GEO = {
+      HIGH: new THREE.SphereGeometry(9,16,16),
+      MID:  new THREE.SphereGeometry(9,12,12),
+      LOW:  new THREE.SphereGeometry(9,10,10),
+    };
 
-      modalClose.addEventListener("click", () => {
-        modal.classList.remove("show");
-      });
+    // ===== CLUSTERS =====
+    const clusters: any[] = [];
+    const filteredZones = zones.filter((z: any) => z.name !== "Level 8: The Void");
+    const positions: THREE.Vector3[] = [];
+    const MIN_DISTANCE = 200;
 
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-          modal.classList.remove("show");
-        }
-      });
+    const rand = (a: number, b: number) => Math.random()*(b-a)+a;
+    const isValid = (p: THREE.Vector3) => positions.every((q) => q.distanceTo(p) >= MIN_DISTANCE);
 
-      addEventListener("keydown", (e) => {
-        if (e.code === "Escape" && modal.classList.contains("show")) {
-          modal.classList.remove("show");
-          e.stopPropagation();
-        }
-      });
+    mlConcepts.forEach((concept: any) => {
+      const zone = filteredZones.find((z: any) => concept.depth>=z.start && concept.depth<z.end);
+      if (!zone) return;
 
-      ////////////////////////////////////////////////////////////
-      // GEOMETRY (7/10 QUALITY)
-      ////////////////////////////////////////////////////////////
-      const GEO = {
-        HIGH: new THREE.SphereGeometry(9, 16, 16),
-        MID: new THREE.SphereGeometry(9, 12, 12),
-        LOW: new THREE.SphereGeometry(9, 10, 10),
-      };
-
-      ////////////////////////////////////////////////////////////
-      // GENERATE CLUSTERS FROM ML CONCEPTS
-      ////////////////////////////////////////////////////////////
-      const clusters: any[] = [];
-
-      // Helper function for random range
-      const rand = (min: number, max: number) =>
-        Math.random() * (max - min) + min;
-
-      // Group concepts by depth zones for color coding (excluding "The Void")
-      const filteredZones = zones.filter((z) => z.name !== "Level 8: The Void");
-
-      // Collision detection helper
-      const MIN_DISTANCE = 200; // Minimum distance between cluster centers
-      const positions: THREE.Vector3[] = [];
-
-      const isValidPosition = (newPos: THREE.Vector3) => {
-        for (const existingPos of positions) {
-          const distance = newPos.distanceTo(existingPos);
-          if (distance < MIN_DISTANCE) {
-            return false;
-          }
-        }
-        return true;
-      };
-
-      mlConcepts.forEach((concept: any, index: number) => {
-        // Find which zone this concept belongs to (excluding The Void)
-        const zone = filteredZones.find(
-          (z) => concept.depth >= z.start && concept.depth < z.end,
+      let center: THREE.Vector3;
+      let tries=0;
+      do {
+        const r = 800*(0.3+Math.min(concept.depth/14000,1)*0.7);
+        const t = rand(0,Math.PI*2);
+        const p = Math.acos(rand(-1,1));
+        center = new THREE.Vector3(
+          r*Math.sin(p)*Math.cos(t),
+          r*Math.sin(p)*Math.sin(t),
+          r*Math.cos(p)
         );
-        if (!zone) return; // Skip concepts in The Void
+        tries++;
+      } while(!isValid(center) && tries<50);
+      if (!isValid(center)) return;
 
-        const color = new THREE.Color(zone.color);
+      positions.push(center);
 
-        // Calculate importance (normalized depth within valid range)
-        const maxDepth = 14000; // Exclude The Void (14000+)
-        const importance = Math.min(concept.depth / maxDepth, 1);
+      const points: THREE.Vector3[] = [];
+      for (let i=0;i<SPHERES_PER_CONCEPT;i++){
+        points.push(center.clone().add(new THREE.Vector3(rand(-30,30),rand(-30,30),rand(-30,30))));
+      }
 
-        // Try to find a non-colliding position
-        let center;
-        let attempts = 0;
-        const maxAttempts = 50;
+      clusters.push({
+        center,
+        color:new THREE.Color(zone.color),
+        points,
+        navPoint: points[0], // SINGLE SOURCE OF TRUTH
+        concept
+      });
+    });
 
-        do {
-          // Spherical distribution based on importance
-          const baseRadius = 800; // Increased base radius for more spread
-          const r = baseRadius * (0.3 + importance * 0.7); // Min 30% radius
-          const theta = rand(0, 2 * Math.PI);
-          const phi = Math.acos(rand(-1, 1));
+    // ===== NAV LIST (SINGLE SOURCE OF TRUTH) =====
+    const navigableClusters = clusters
+      .filter((c: any) => c.concept)
+      .sort((a: any, b: any) => a.concept.depth - b.concept.depth);
 
-          const cx = 0,
-            cy = 0,
-            cz = 0; // Center point
+    let currentNavIndex = -1;
 
-          center = new THREE.Vector3(
-            cx + r * Math.sin(phi) * Math.cos(theta),
-            cy + r * Math.sin(phi) * Math.sin(theta),
-            cz + r * Math.cos(phi),
-          );
-
-          attempts++;
-        } while (!isValidPosition(center) && attempts < maxAttempts);
-
-        // If we couldn't find a valid position after max attempts, skip this concept
-        if (attempts >= maxAttempts && !isValidPosition(center)) {
-          console.warn(`Skipping concept ${concept.name} due to collision`);
-          return;
+    // ===== CHUNKING =====
+    const chunks = new Map();
+    let minX=Infinity, minZ=Infinity;
+    clusters.forEach((c: any) => c.points.forEach((p: THREE.Vector3) => { minX=Math.min(minX,p.x); minZ=Math.min(minZ,p.z); }));
+    clusters.forEach((cluster: any, ci: number) => {
+      cluster.points.forEach((p: THREE.Vector3) => {
+        const cx=Math.floor((p.x-minX)/CHUNK_SIZE);
+        const cz=Math.floor((p.z-minZ)/CHUNK_SIZE);
+        const key=`${cx},${cz}`;
+        if(!chunks.has(key)){
+          chunks.set(key,{ center:new THREE.Vector3(minX+(cx+.5)*CHUNK_SIZE,0,minZ+(cz+.5)*CHUNK_SIZE), clusters:new Map(), current:null });
         }
+        if(!chunks.get(key).clusters.has(ci)) chunks.get(key).clusters.set(ci,[]);
+        chunks.get(key).clusters.get(ci).push(p);
+      });
+    });
 
-        positions.push(center);
-
-        // Create small cluster of spheres for each concept
-        const points = [];
-        const clusterRadius = 30 + importance * 50;
-
-        for (let i = 0; i < SPHERES_PER_CONCEPT; i++) {
-          const u = Math.random();
-          const v = Math.random();
-          const t = u * 2 * Math.PI;
-          const p = Math.acos(2 * v - 1);
-          const cr = Math.random() * clusterRadius;
-
-          points.push(
-            new THREE.Vector3(
-              center.x + cr * Math.sin(p) * Math.cos(t),
-              center.y + cr * Math.sin(p) * Math.sin(t),
-              center.z + cr * Math.cos(p),
-            ),
-          );
-        }
-
-        clusters.push({
-          center,
-          color,
-          points,
-          concept: concept,
+    // ===== BUILD MESHES =====
+    const dummy=new THREE.Object3D();
+    const allMeshes: THREE.InstancedMesh[] = [];
+    for(const chunk of chunks.values()){
+      chunk.lod={HIGH:[],MID:[],LOW:[]};
+      for(const [ci,points] of chunk.clusters.entries()){
+        const mat=new THREE.MeshStandardMaterial({
+          color:clusters[ci].color,
+          emissive:clusters[ci].color,
+          emissiveIntensity:.8, metalness:.03, roughness:.01
         });
-      });
-
-      ////////////////////////////////////////////////////////////
-      // PRECOMPUTE NAVIGATION LIST (SINGLE SOURCE OF TRUTH)
-      ////////////////////////////////////////////////////////////
-      const navigableClusters = clusters
-        .filter(c => c.concept)
-        .sort((a, b) => a.concept.depth - b.concept.depth);
-
-      ////////////////////////////////////////////////////////////
-      // CHUNKING
-      ////////////////////////////////////////////////////////////
-      const chunks = new Map();
-      let minX = Infinity,
-        minZ = Infinity;
-
-      clusters.forEach((c) =>
-        c.points.forEach((p:any) => {
-          minX = Math.min(minX, p.x);
-          minZ = Math.min(minZ, p.z);
-        }),
-      );
-
-      clusters.forEach((cluster, ci) => {
-        cluster.points.forEach((p:any) => {
-          const cx = Math.floor((p.x - minX) / CHUNK_SIZE);
-          const cz = Math.floor((p.z - minZ) / CHUNK_SIZE);
-          const key = `${cx},${cz}`;
-          if (!chunks.has(key)) {
-            chunks.set(key, {
-              center: new THREE.Vector3(
-                minX + (cx + 0.5) * CHUNK_SIZE,
-                0,
-                minZ + (cz + 0.5) * CHUNK_SIZE,
-              ),
-              clusters: new Map(),
-              current: null,
-            });
-          }
-          if (!chunks.get(key).clusters.has(ci))
-            chunks.get(key).clusters.set(ci, []);
-          chunks.get(key).clusters.get(ci).push(p);
+        (["HIGH","MID","LOW"] as const).forEach((level) => {
+          const mesh=new THREE.InstancedMesh(GEO[level],mat,points.length);
+          mesh.visible=false; mesh.frustumCulled=false;
+          mesh.userData={ points, concept:clusters[ci].concept };
+          points.forEach((p: THREE.Vector3, i: number) => { dummy.position.copy(p); dummy.updateMatrix(); mesh.setMatrixAt(i,dummy.matrix); });
+          scene.add(mesh); chunk.lod[level].push(mesh); allMeshes.push(mesh);
         });
-      });
+      }
+    }
 
-      ////////////////////////////////////////////////////////////
-      // BUILD MESHES (ONE MATERIAL PER CLUSTER)
-      ////////////////////////////////////////////////////////////
-      const dummy = new THREE.Object3D();
-      const allMeshes: THREE.InstancedMesh[] = []; // Track all meshes for raycasting
+    // ===== RAYCAST =====
+    const raycaster=new THREE.Raycaster();
+    const centerMouse=new THREE.Vector2(0,0);
+    let selectedSphere: any = null;
 
-      for (const chunk of chunks.values()) {
-        chunk.lod = { HIGH: [], MID: [], LOW: [] };
+    // highlight
+    const ring=new THREE.Mesh(
+      new THREE.RingGeometry(12,15,32),
+      new THREE.MeshBasicMaterial({color:0xffffff, side:THREE.DoubleSide})
+    );
+    ring.visible=false; scene.add(ring);
 
-        for (const [ci, points] of chunk.clusters.entries()) {
-          const col = clusters[ci].color;
+    // ===== CAMERA ANIM =====
+    let isAnimating=false;
+    let animationStart=0;
+    const animationDuration=1200;
+    const startPos=new THREE.Vector3(), targetPos=new THREE.Vector3();
+    const startQuat=new THREE.Quaternion(), targetQuat=new THREE.Quaternion();
 
-          const material = new THREE.MeshStandardMaterial({
-            color: col,
-            emissive: col,
-            emissiveIntensity: 0.8,
-            metalness: 0.03,
-            roughness: 0.01,
-          });
+    function moveCameraToCluster(cluster: any){
+      const target=cluster.navPoint.clone();
+      const dist=120;
+      const dir=new THREE.Vector3().subVectors(camera.position,target).normalize();
+      if (dir.lengthSq() === 0) dir.set(0,0,1);
+      const finalPos=target.clone().addScaledVector(dir,dist);
+      const lookM=new THREE.Matrix4().lookAt(finalPos,target,new THREE.Vector3(0,1,0));
 
-          for (const level of ["HIGH", "MID", "LOW"] as const) {
-            const mesh = new THREE.InstancedMesh(
-              GEO[level],
-              material,
-              points.length,
-            );
-            mesh.visible = false;
-            mesh.frustumCulled = false;
+      startPos.copy(camera.position);
+      targetPos.copy(finalPos);
+      startQuat.copy(camera.quaternion);
+      targetQuat.setFromRotationMatrix(lookM);
 
-            // Store metadata on the mesh itself
-            mesh.userData = {
-              clusterIndex: ci,
-              clusterColor: col,
-              points: points,
-              level: level,
-              concept: clusters[ci].concept, // Add concept data
-            };
+      animationStart=performance.now();
+      isAnimating=true;
+    }
 
-            points.forEach((p: THREE.Vector3, i: number) => {
-              dummy.position.copy(p);
-              dummy.updateMatrix();
-              mesh.setMatrixAt(i, dummy.matrix);
-            });
+    function gotoIndex(i: number){
+      if(isAnimating || !navigableClusters.length) return;
+      currentNavIndex=(i+navigableClusters.length)%navigableClusters.length;
+      moveCameraToCluster(navigableClusters[currentNavIndex]);
+    }
+    const gotoNext=() => gotoIndex(currentNavIndex+1);
+    const gotoPrev=() => gotoIndex(currentNavIndex-1);
 
-            mesh.instanceMatrix.needsUpdate = true;
-            scene.add(mesh);
-            chunk.lod[level].push(mesh);
-            allMeshes.push(mesh);
-          }
+    // LEFT / RIGHT CLICK = navigation
+    addEventListener("mousedown", (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if(el?.closest("#help") || el?.closest("#modal")) return;
+      if(!selectedSphere?.concept) return;
+
+      currentNavIndex=navigableClusters.findIndex((c: any) => c.concept.id===selectedSphere.concept.id);
+      if(currentNavIndex===-1) return;
+
+      if(e.button===0) gotoNext();
+      if(e.button===2) gotoPrev();
+    });
+
+    // pointer lock
+    document.body.onclick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if(target?.closest("#help") || target?.closest("#modal")) return;
+      document.body.requestPointerLock();
+    };
+
+    // ===== KEYBOARD MOVEMENT =====
+    const keys = Object.create(null);
+
+    addEventListener("keydown", (e: KeyboardEvent) => {
+      keys[e.code] = true;
+    });
+
+    addEventListener("keyup", (e: KeyboardEvent) => {
+      keys[e.code] = false;
+    });
+
+    const MOVE = {
+      forward: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+    };
+
+    const WALK_SPEED = 500;
+    const SPRINT_SPEED = WALK_SPEED*6;
+
+    function moveCamera(dt: number) {
+      MOVE.dir.set(0, 0, 0);
+
+      MOVE.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      MOVE.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+
+      if (keys.KeyW || keys.ArrowUp) MOVE.dir.add(MOVE.forward);
+      if (keys.KeyS || keys.ArrowDown) MOVE.dir.sub(MOVE.forward);
+      if (keys.KeyD || keys.ArrowRight) MOVE.dir.add(MOVE.right);
+      if (keys.KeyA || keys.ArrowLeft) MOVE.dir.sub(MOVE.right);
+
+      if (MOVE.dir.lengthSq() === 0) return;
+
+      MOVE.dir.normalize();
+      const speed = keys.ShiftLeft ? SPRINT_SPEED : WALK_SPEED;
+      camera.position.addScaledVector(MOVE.dir, speed * dt * 0.001);
+    }
+
+    // ===== INPUT =====
+    let rx=0, ry=0;
+    addEventListener("mousemove", (e: MouseEvent) => {
+      if(document.pointerLockElement!==document.body || isAnimating) return;
+      ry-=e.movementX*0.002; rx-=e.movementY*0.002;
+      rx=Math.max(-Math.PI/2,Math.min(Math.PI/2,rx));
+      camera.rotation.set(rx,ry,0,"YXZ");
+    });
+
+    // ===== LOOP =====
+    let last=performance.now(), fps=0, fc=0, ft=performance.now();
+    function pickLOD(d: number){ return d<900?"HIGH":d<3500?"MID":"LOW"; }
+
+    function loop(now=performance.now()){
+      requestAnimationFrame(loop);
+      const dt=now-last; last=now;
+
+      fc++; if(now-ft>=500){ fps=Math.round(fc*1000/(now-ft)); fc=0; ft=now; }
+      hud.textContent=String(fps);
+
+      if(isAnimating){
+        const t=Math.min((now-animationStart)/animationDuration,1);
+        const s=t*t*(3-2*t);
+        camera.position.lerpVectors(startPos,targetPos,s);
+        camera.quaternion.slerpQuaternions(startQuat,targetQuat,s);
+        if(t>=1){
+          isAnimating=false;
+          // HARD SYNC — critical
+          const eul=new THREE.Euler().setFromQuaternion(camera.quaternion,"YXZ");
+          rx=eul.x; ry=eul.y;
         }
       }
 
-      ////////////////////////////////////////////////////////////
-      // RAYCASTING & SELECTION
-      ////////////////////////////////////////////////////////////
-      const raycaster = new THREE.Raycaster();
-      const centerMouse = new THREE.Vector2(0, 0); // Center of screen
-      let selectedSphere: any = null;
-      let currentNavIndex = -1; // Track current index in navigableClusters
+      // Camera movement (only when not animating and pointer locked)
+      if (!isAnimating && document.pointerLockElement === document.body) {
+        moveCamera(dt);
+      }
 
-      // Create highlight ring
-      const ringGeometry = new THREE.RingGeometry(12, 15, 32);
-      const ringMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.8,
-      });
-      const highlightMesh = new THREE.Mesh(ringGeometry, ringMaterial);
-      highlightMesh.visible = false;
-      scene.add(highlightMesh);
-
-      // Camera animation variables
-      let isAnimating = false;
-      let animationStart = 0;
-      let animationDuration = 1500; // 1.5 seconds
-      let startPosition = new THREE.Vector3();
-      let targetPosition = new THREE.Vector3();
-      let startQuat = new THREE.Quaternion();
-      let targetQuat = new THREE.Quaternion();
-
-      function animateCamera(now: number) {
-        if (!isAnimating) return;
-
-        const t = Math.min((now - animationStart) / animationDuration, 1);
-        
-        // Smoothstep (better easing)
-        const eased = t * t * (3 - 2 * t);
-
-        camera.position.lerpVectors(startPosition, targetPosition, eased);
-        camera.quaternion.slerpQuaternions(startQuat, targetQuat, eased);
-
-        if (t >= 1) {
-          isAnimating = false;
-          
-          // HARD SYNC — critical to prevent mouse snap
-          const euler = new THREE.Euler().setFromQuaternion(
-            camera.quaternion,
-            "YXZ"
-          );
-          
-          rx = euler.x;
-          ry = euler.y;
+      for(const chunk of chunks.values()){
+        const d=camera.position.distanceTo(chunk.center);
+        if(d>RENDER_DIST){ if(chunk.current) chunk.lod[chunk.current].forEach((m: THREE.InstancedMesh) => m.visible=false); chunk.current=null; continue; }
+        const l=pickLOD(d);
+        if(chunk.current!==l){
+          if(chunk.current) chunk.lod[chunk.current].forEach((m: THREE.InstancedMesh) => m.visible=false);
+          chunk.lod[l].forEach((m: THREE.InstancedMesh) => m.visible=true);
+          chunk.current=l;
         }
       }
 
-      function moveToNextConcept() {
-        if (isAnimating || navigableClusters.length === 0) return;
-
-        currentNavIndex = (currentNavIndex + 1) % navigableClusters.length;
-        const targetCluster = navigableClusters[currentNavIndex];
-        const target = targetCluster.center.clone();
-
-        // === CAMERA PLACEMENT ===
-        const distance = 120; // stable viewing distance
-
-        // Direction: from target → outward
-        const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
-
-        // Fallback if camera is exactly at target
-        if (dir.lengthSq() === 0) dir.set(0, 0, 1);
-
-        const finalPosition = target.clone().addScaledVector(dir, distance);
-
-        // === ROTATION ===
-        const lookMatrix = new THREE.Matrix4().lookAt(
-          finalPosition,
-          target,
-          new THREE.Vector3(0, 1, 0)
-        );
-        const finalQuat = new THREE.Quaternion().setFromRotationMatrix(lookMatrix);
-
-        // === STORE START / TARGET ===
-        startPosition.copy(camera.position);
-        targetPosition.copy(finalPosition);
-        startQuat.copy(camera.quaternion);
-        targetQuat.copy(finalQuat);
-
-        // === ANIMATION STATE ===
-        animationStart = performance.now();
-        isAnimating = true;
-
-        console.log(
-          `Moving to: ${targetCluster.concept.name} (${currentNavIndex + 1}/${navigableClusters.length})`,
-        );
-      }
-
-      // Click handler for sphere navigation
-      addEventListener("click", (e) => {
-        // Don't handle clicks on UI elements
-        const target = e.target as HTMLElement;
-        if (target.closest("#help") || target.closest("#modal")) {
-          return;
-        }
-
-        if (selectedSphere && selectedSphere.concept) {
-          // Find the index in navigableClusters (single source of truth)
-          currentNavIndex = navigableClusters.findIndex(
-            c => c.concept.id === selectedSphere.concept.id
-          );
-
-          if (currentNavIndex !== -1) {
-            moveToNextConcept();
-          }
-        }
-      });
-
-      function checkSelection() {
-        raycaster.setFromCamera(centerMouse, camera);
-
-        // Only raycast against visible meshes
-        const visibleMeshes = allMeshes.filter((m) => m.visible);
-
-        if (visibleMeshes.length === 0) {
-          selectedSphere = null;
-          crosshair.style.borderColor = "rgba(135,206,235,0.8)";
-          highlightMesh.visible = false;
-          info.style.display = "none";
-          return;
-        }
-
-        const intersects = raycaster.intersectObjects(visibleMeshes);
-
-        if (intersects.length > 0) {
-          const hit = intersects[0];
-          const instanceId = hit.instanceId;
-          const mesh = hit.object;
-          const userData = mesh.userData;
-
-          // Get sphere position from the points array
-          const spherePos = userData.points[instanceId!];
-
-          selectedSphere = {
-            position: spherePos,
-            clusterIndex: userData.clusterIndex,
-            sphereIndex: instanceId!,
-            distance: camera.position.distanceTo(spherePos),
-            concept: userData.concept, // Add concept data
-          };
-
-          // Update crosshair
-          crosshair.style.borderColor = "rgb(255,255,255)";
-
-          // Position highlight ring
-          highlightMesh.position.copy(spherePos);
-          highlightMesh.lookAt(camera.position);
-          highlightMesh.visible = true;
-
-          // Update info panel with concept data
-          const concept = userData.concept;
-          info.style.display = "block";
-          info.innerHTML = `
-            <strong>${concept.name}</strong><br>
-            <span style="font-size: 14px; opacity: 0.8;">${concept.description}</span><br>
-            <span style="font-size: 12px; opacity: 0.6;">Depth: ${concept.depth}m | Category: ${concept.category}</span><br>
-            <span style="font-size: 12px; color: #FFD700;">Click to navigate to next concept →</span><br>
-            <a href="${concept.link}" target="_blank" style="color: #87CEEB; font-size: 12px;">Learn More →</a>
-          `;
+      if(!isAnimating){
+        raycaster.setFromCamera(centerMouse,camera);
+        const hits=raycaster.intersectObjects(allMeshes.filter((m) => m.visible));
+        if(hits.length){
+          const h=hits[0];
+          const p=h.object.userData.points[h.instanceId!];
+          selectedSphere={ position:p, concept:h.object.userData.concept };
+          ring.position.copy(p); ring.lookAt(camera.position); ring.visible=true;
+          info.style.display="block";
+          info.innerHTML=`<b>${selectedSphere.concept.name}</b><br><span style="font-size:12px;opacity:.7">${selectedSphere.concept.description}</span>`;
         } else {
-          selectedSphere = null;
-          crosshair.style.borderColor = "rgba(135,206,235,0.8)";
-          highlightMesh.visible = false;
-          info.style.display = "none";
+          selectedSphere=null; ring.visible=false; info.style.display="none";
         }
       }
 
-      ////////////////////////////////////////////////////////////
-      // LOD + VISIBILITY
-      ////////////////////////////////////////////////////////////
-      function pickLOD(d: number) {
-        if (d < 900) return "HIGH";
-        if (d < 3500) return "MID";
-        return "LOW";
-      }
+      composer.render();
+    }
+    loop();
 
-      function update() {
-        let visible = 0;
-
-        for (const chunk of chunks.values()) {
-          const d = camera.position.distanceTo(chunk.center);
-          if (d > RENDER_DIST) {
-            if (chunk.current)
-              chunk.lod[chunk.current].forEach(
-                (m: THREE.InstancedMesh) => (m.visible = false),
-              );
-            chunk.current = null;
-            continue;
-          }
-
-          const l = pickLOD(d);
-          if (chunk.current !== l) {
-            if (chunk.current)
-              chunk.lod[chunk.current].forEach(
-                (m: THREE.InstancedMesh) => (m.visible = false),
-              );
-            chunk.lod[l].forEach(
-              (m: THREE.InstancedMesh) => (m.visible = true),
-            );
-            chunk.current = l;
-          }
-
-          chunk.lod[l].forEach(
-            (m: THREE.InstancedMesh) => (visible += m.count),
-          );
-        }
-
-        hud.innerHTML = `${fps} `;
-      }
-
-      ////////////////////////////////////////////////////////////
-      // CONFIG
-      ////////////////////////////////////////////////////////////
-      const CONFIG = {
-        mouseSensitivity: 0.002,
-        walkSpeed: 16,
-        sprintSpeed: 80,
-        afkTimeout: 10000, // ms (15 seconds)
-      };
-
-      ////////////////////////////////////////////////////////////
-      // STATE
-      ////////////////////////////////////////////////////////////
-      let rx = 0;
-      let ry = 0;
-      let lastInputTime = performance.now();
-      let isAFK = false;
-      let afkTime = 0;
-
-      const keys = Object.create(null);
-
-      ////////////////////////////////////////////////////////////
-      // REUSABLE VECTORS (NO GC)
-      ////////////////////////////////////////////////////////////
-      const VEC = {
-        dir: new THREE.Vector3(),
-        forward: new THREE.Vector3(),
-        right: new THREE.Vector3(),
-      };
-
-      ////////////////////////////////////////////////////////////
-      // INPUT ACTIVITY
-      ////////////////////////////////////////////////////////////
-      function registerActivity() {
-        lastInputTime = performance.now();
-        if (isAFK) {
-          isAFK = false;
-          afkTime = 0;
-        }
-      }
-
-      ////////////////////////////////////////////////////////////
-      // AFK CAMERA
-      ////////////////////////////////////////////////////////////
-      function updateAFKCamera(dt: number) {
-        afkTime += dt * 0.001;
-
-        // Smooth rotation (reduced speed)
-        ry += 0.000003 * dt;
-        rx = Math.sin(afkTime * 0.03) * 0.03;
-
-        camera.rotation.order = "YXZ";
-        camera.rotation.set(rx, ry, 0);
-
-        // Direction vectors
-        VEC.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-        VEC.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-
-        // Drift (reduced movement speed)
-        VEC.dir
-          .copy(VEC.forward)
-          .addScaledVector(VEC.right, Math.sin(afkTime * 0.05) * 0.03)
-          .normalize();
-
-        camera.position.addScaledVector(VEC.dir, 0.0000001 * dt * 0.01);
-      }
-
-      ////////////////////////////////////////////////////////////
-      // MANUAL MOVEMENT
-      ////////////////////////////////////////////////////////////
-      function move(dt: number) {
-        VEC.dir.set(0, 0, 0);
-
-        VEC.forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-        VEC.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-
-        if (keys.KeyW || keys.ArrowUp) VEC.dir.add(VEC.forward);
-        if (keys.KeyS || keys.ArrowDown) VEC.dir.sub(VEC.forward);
-        if (keys.KeyD || keys.ArrowRight) VEC.dir.add(VEC.right);
-        if (keys.KeyA || keys.ArrowLeft) VEC.dir.sub(VEC.right);
-
-        if (VEC.dir.lengthSq() > 0) {
-          VEC.dir.normalize();
-          const speed = keys.ShiftLeft ? CONFIG.sprintSpeed : CONFIG.walkSpeed;
-          camera.position.addScaledVector(VEC.dir, speed);
-        }
-      }
-
-      ////////////////////////////////////////////////////////////
-      // INPUT HANDLERS
-      ////////////////////////////////////////////////////////////
-      document.body.onclick = (e) => {
-        // Don't lock pointer if clicking on help button or modal
-        const target = e.target as HTMLElement;
-        if (target.closest("#help") || target.closest("#modal")) {
-          return;
-        }
-        document.body.requestPointerLock();
-        registerActivity();
-      };
-
-      addEventListener("mousemove", (e) => {
-        if (document.pointerLockElement !== document.body || isAnimating) return;
-
-        registerActivity();
-        if (isAFK) return;
-
-        ry -= e.movementX * CONFIG.mouseSensitivity;
-        rx -= e.movementY * CONFIG.mouseSensitivity;
-
-        rx = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rx));
-
-        camera.rotation.order = "YXZ";
-        camera.rotation.set(rx, ry, 0);
-      });
-
-      addEventListener("keydown", (e) => {
-        keys[e.code] = true;
-        registerActivity();
-      });
-
-      addEventListener("keyup", (e) => {
-        keys[e.code] = false;
-        registerActivity();
-      });
-
-      ////////////////////////////////////////////////////////////
-      // MAIN LOOP
-      ////////////////////////////////////////////////////////////
-      function loop(now = performance.now()) {
-        requestAnimationFrame(loop);
-
-        const dt = now - last;
-        last = now;
-
-        // Update FPS counter every 500ms
-        frameCount++;
-        if (now - fpsUpdateTime >= 500) {
-          fps = Math.round((frameCount * 1000) / (now - fpsUpdateTime));
-          frameCount = 0;
-          fpsUpdateTime = now;
-        }
-
-        isAFK = now - lastInputTime > CONFIG.afkTimeout;
-
-        // Toggle UI visibility based on AFK state
-        if (isAFK) {
-          hud.style.opacity = "0";
-          crosshair.style.opacity = "0";
-          info.style.opacity = "0";
-          help.style.opacity = "0";
-          highlightMesh.visible = false;
-          updateAFKCamera(dt);
-        } else {
-          hud.style.opacity = "1";
-          crosshair.style.opacity = "1";
-          info.style.opacity = "1";
-          help.style.opacity = "1";
-          move(dt);
-        }
-
-        update();
-        if (!isAnimating) {
-          if (!isAFK) checkSelection(); // Only check selection when not AFK and not animating
-        } else {
-          animateCamera(now); // Animate camera movement
-        }
-        composer.render(); // Use composer instead of renderer.render()
-      }
-
-      loop();
-
-      ////////////////////////////////////////////////////////////
-      // RESIZE
-      ////////////////////////////////////////////////////////////
-      addEventListener("resize", () => {
-        camera.aspect = innerWidth / innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(innerWidth, innerHeight);
-      });
-    </script>
-  </body>
+    addEventListener("resize",() => {
+      camera.aspect=innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth,innerHeight);
+    });
+  </script>
+</body>
 </html>
