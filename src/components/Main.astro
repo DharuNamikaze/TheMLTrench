@@ -36,6 +36,12 @@
       border-radius:12px; padding:30px 40px; color:#fff; position:relative;
     }
     .modal-close { position:absolute; top:12px; right:16px; font-size:26px; background:none; border:none; color:#87CEEB; cursor:pointer; }
+    .tit{
+      
+    }
+    @keyframe intro {
+      
+    }
   </style>
 </head>
 
@@ -44,7 +50,7 @@
   <div id="crosshair"></div>
   <div id="info"></div>
   <div id="help">? Help</div>
-  <div style="position:fixed; top:10px; left:10px; color:#fff; font-size:26px; font-weight:700; z-index:10;">Deep ML Space</div>
+  <div class="tit" style="position:fixed; top:10px; left:10px; color:#fff; font-size:26px; font-weight:700; z-index:10;">Deep ML Space</div>
 
   <div id="modal">
     <div class="modal-content">
@@ -156,9 +162,20 @@
     const filteredZones = zones.filter((z: any) => z.name !== "Level 8: The Void");
     const positions: THREE.Vector3[] = [];
     const MIN_DISTANCE = CONFIG.world.minClusterDistance;
+    const MIN_DISTANCE_SQ = MIN_DISTANCE * MIN_DISTANCE; // Pre-calculate squared
 
     const rand = (a: number, b: number) => Math.random()*(b-a)+a;
-    const isValid = (p: THREE.Vector3) => positions.every((q) => q.distanceTo(p) >= MIN_DISTANCE);
+    
+    // OPTIMIZED: Use squared distance to avoid sqrt
+    const isValid = (p: THREE.Vector3) => {
+      for(let i = 0; i < positions.length; i++) {
+        const dx = p.x - positions[i].x;
+        const dy = p.y - positions[i].y;
+        const dz = p.z - positions[i].z;
+        if(dx*dx + dy*dy + dz*dz < MIN_DISTANCE_SQ) return false;
+      }
+      return true;
+    };
 
     mlConcepts.forEach((concept: any) => {
       // Validation
@@ -201,7 +218,7 @@
         center,
         color:new THREE.Color(zone.color),
         points,
-        navPoint: points[0], // SINGLE SOURCE OF TRUTH
+        navPoint: points[0],
         concept
       });
     });
@@ -216,43 +233,89 @@
     // ===== CHUNKING =====
     const chunks = new Map();
     let minX=Infinity, minZ=Infinity;
-    clusters.forEach((c: any) => c.points.forEach((p: THREE.Vector3) => { minX=Math.min(minX,p.x); minZ=Math.min(minZ,p.z); }));
-    clusters.forEach((cluster: any, ci: number) => {
-      cluster.points.forEach((p: THREE.Vector3) => {
-        const cx=Math.floor((p.x-minX)/CHUNK_SIZE);
-        const cz=Math.floor((p.z-minZ)/CHUNK_SIZE);
+    
+    // OPTIMIZED: Single pass to find min values
+    for(let c=0; c<clusters.length; c++){
+      const points = clusters[c].points;
+      for(let p=0; p<points.length; p++){
+        if(points[p].x < minX) minX = points[p].x;
+        if(points[p].z < minZ) minZ = points[p].z;
+      }
+    }
+    
+    // OPTIMIZED: Build chunks in single pass
+    for(let ci=0; ci<clusters.length; ci++){
+      const cluster = clusters[ci];
+      const points = cluster.points;
+      for(let p=0; p<points.length; p++){
+        const point = points[p];
+        const cx=Math.floor((point.x-minX)/CHUNK_SIZE);
+        const cz=Math.floor((point.z-minZ)/CHUNK_SIZE);
         const key=`${cx},${cz}`;
-        if(!chunks.has(key)){
-          chunks.set(key,{ center:new THREE.Vector3(minX+(cx+.5)*CHUNK_SIZE,0,minZ+(cz+.5)*CHUNK_SIZE), clusters:new Map(), current:null });
+        
+        let chunk = chunks.get(key);
+        if(!chunk){
+          chunk = { 
+            center:new THREE.Vector3(minX+(cx+.5)*CHUNK_SIZE,0,minZ+(cz+.5)*CHUNK_SIZE), 
+            clusters:new Map(), 
+            current:null 
+          };
+          chunks.set(key, chunk);
         }
-        if(!chunks.get(key).clusters.has(ci)) chunks.get(key).clusters.set(ci,[]);
-        chunks.get(key).clusters.get(ci).push(p);
-      });
-    });
+        
+        let clusterPoints = chunk.clusters.get(ci);
+        if(!clusterPoints){
+          clusterPoints = [];
+          chunk.clusters.set(ci, clusterPoints);
+        }
+        clusterPoints.push(point);
+      }
+    }
 
     // ===== BUILD MESHES =====
     const dummy=new THREE.Object3D();
     const allMeshes: THREE.InstancedMesh[] = [];
-    const visibleMeshes: THREE.InstancedMesh[] = []; // Cache for visible meshes
+    const visibleMeshes: THREE.InstancedMesh[] = [];
     
-    for(const chunk of chunks.values()){
+    // OPTIMIZED: Build all meshes efficiently
+    const chunkArray = Array.from(chunks.values());
+    for(let chunkIdx=0; chunkIdx<chunkArray.length; chunkIdx++){
+      const chunk = chunkArray[chunkIdx];
       chunk.lod={HIGH:[],MID:[],LOW:[]};
-      for(const [ci,points] of chunk.clusters.entries()){
+      
+      const clusterEntries = Array.from(chunk.clusters.entries());
+      for(let entryIdx=0; entryIdx<clusterEntries.length; entryIdx++){
+        const [ci, points] = clusterEntries[entryIdx];
+        const cluster = clusters[ci];
+        
         const mat=new THREE.MeshStandardMaterial({
-          color:clusters[ci].color,
-          emissive:clusters[ci].color,
-          emissiveIntensity:.8, metalness:.03, roughness:.01
+          color:cluster.color,
+          emissive:cluster.color,
+          emissiveIntensity:.8, 
+          metalness:.03, 
+          roughness:.01
         });
-        (["HIGH","MID","LOW"] as const).forEach((level) => {
+        
+        const levels = ["HIGH","MID","LOW"] as const;
+        for(let levelIdx=0; levelIdx<levels.length; levelIdx++){
+          const level = levels[levelIdx];
           const mesh=new THREE.InstancedMesh(GEO[level],mat,points.length);
           mesh.visible=false;
-          // CRITICAL FIX: Enable frustum culling for 30-50% FPS improvement
           mesh.frustumCulled = CONFIG.performance.enableFrustumCulling;
-          mesh.userData={ points, concept:clusters[ci].concept };
-          points.forEach((p: THREE.Vector3, i: number) => { dummy.position.copy(p); dummy.updateMatrix(); mesh.setMatrixAt(i,dummy.matrix); });
+          mesh.userData={ points, concept:cluster.concept };
+          
+          // OPTIMIZED: Batch matrix updates
+          for(let i=0; i<points.length; i++){
+            dummy.position.copy(points[i]);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i,dummy.matrix);
+          }
           mesh.instanceMatrix.needsUpdate = true;
-          scene.add(mesh); chunk.lod[level].push(mesh); allMeshes.push(mesh);
-        });
+          
+          scene.add(mesh);
+          chunk.lod[level].push(mesh);
+          allMeshes.push(mesh);
+        }
       }
     }
 
