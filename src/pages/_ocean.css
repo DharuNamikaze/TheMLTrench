@@ -1,4 +1,9 @@
 /* Reset default margins and ensure full width */
+
+@theme {
+  --font-sans: var(--font-inter);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -31,9 +36,14 @@ html {
   overflow-x: hidden;
   background-color: #000;
   color: white;
+  font-family: var(--font-inter), sans-serif;
   /* Firefox Scrollbar */
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+* {
+  font-family: inherit;
 }
 
 main {
@@ -79,6 +89,7 @@ main {
 /* Ocean section */
 .ocean-section {
   position: relative;
+  z-index: 10;
   background: linear-gradient(
     180deg, 
     #4fc3f7 0%,    /* Base */
@@ -105,7 +116,6 @@ main {
 .depth-marker {
   position: absolute;
   left: 20px;
-  font-family: monospace;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.4);
   font-weight: bold;
@@ -125,6 +135,7 @@ main {
   cursor: pointer;
   width: max-content;
   max-width: 300px;
+  z-index: 20;
 }
 
 .ml-concept.visible {
@@ -172,7 +183,6 @@ main {
 /* Labels */
 .concept-name-label {
   color: rgba(255, 255, 255, 0.9);
-  font-family: sans-serif;
   font-weight: 500;
   text-shadow: 0 0 5px rgba(0,0,0,0.8);
   font-size: 15px;

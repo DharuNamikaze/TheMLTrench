@@ -1,6 +1,7 @@
 ---
 import Analytics from "@vercel/analytics/astro";
 import SpeedInsights from "@vercel/speed-insights/astro";
+import { Font } from "astro:assets";
 ---
 
 <!doctype html>
@@ -12,6 +13,7 @@ import SpeedInsights from "@vercel/speed-insights/astro";
     <meta name="generator" content={Astro.generator} />
     <meta name="title" content="The ML Trench" />
     <meta property="og:title" content="The ML Trench" />
+    <Font cssVariable="--font-inter" preload />
     <title>The ML Trench</title>
     <meta property="og:site_name" content="The ML Trench" />
     <meta
