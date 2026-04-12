@@ -235,7 +235,7 @@
           distanceBasedUpdates: true,
         },
         camera: {
-          walkSpeed: 500,
+          walkSpeed: 400,
           sprintMultiplier: 6,
           animationDuration: 1200,
         },
@@ -781,6 +781,10 @@
       const WALK_SPEED = CONFIG.camera.walkSpeed;
       const SPRINT_SPEED = WALK_SPEED * CONFIG.camera.sprintMultiplier;
 
+      // ===== KEYBOARD VELOCITY =====
+      const velocity = new THREE.Vector3();
+      const FRICTION = 0.72; // bleed off speed — lower = more slide
+
       function moveCamera(dt: number) {
         MOVE.dir.set(0, 0, 0);
 
@@ -792,11 +796,22 @@
         if (keys.KeyD || keys.ArrowRight) MOVE.dir.add(MOVE.right);
         if (keys.KeyA || keys.ArrowLeft) MOVE.dir.sub(MOVE.right);
 
-        if (MOVE.dir.lengthSq() === 0) return;
-
-        MOVE.dir.normalize();
         const speed = keys.ShiftLeft ? SPRINT_SPEED : WALK_SPEED;
-        camera.position.addScaledVector(MOVE.dir, speed * dt * 0.001);
+
+        if (MOVE.dir.lengthSq() > 0) {
+          MOVE.dir.normalize();
+          // accelerate toward target speed
+          velocity.addScaledVector(MOVE.dir, speed * dt * 0.001);
+        }
+
+        // apply friction every frame so it bleeds off when keys released
+        velocity.multiplyScalar(FRICTION);
+
+        if (velocity.lengthSq() > 0.0001) {
+          camera.position.add(velocity);
+        } else {
+          velocity.set(0, 0, 0);
+        }
       }
 
       // ===== INPUT =====
