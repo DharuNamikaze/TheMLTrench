@@ -12,6 +12,10 @@
       type="font/woff2"
       crossorigin
     />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/keyboard-css@1.2.4/dist/css/main.min.css"
+    />
     <style>
       body {
         margin: 0;
@@ -121,6 +125,41 @@
         color: #87ceeb;
         cursor: pointer;
       }
+      #keystroke-display {
+        position: fixed;
+        bottom: 60px;
+        right: 20px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .kbc-toast {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        animation: kbc-fade-out 0.2s ease forwards;
+      }
+      .kbc-toast.kbc-held {
+        animation: none;
+        opacity: 1;
+      }
+      .kbc-toast .kbc-button {
+        font-size: 11px;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 8px;
+        background: rgba(20, 20, 30, 0.9) !important;
+        border-color: rgba(135, 206, 235, 0.5) !important;
+        color: #cce8ff !important;
+        box-shadow: 0 3px 0 rgba(135,206,235,0.25) !important;
+      }
+      @keyframes kbc-fade-out {
+        0%   { opacity: 1; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(-6px); }
+      }
     </style>
   </head>
 
@@ -129,6 +168,7 @@
     <div id="crosshair"></div>
     <div id="info"></div>
     <canvas id="minimap" width="150" height="150"></canvas>
+    <div id="keystroke-display"></div>
     <div id="help">? Help</div>
     <div
       class="tit"
@@ -259,9 +299,12 @@
         mmCtx.fillStyle = "rgba(0,0,0,0.55)";
         mmCtx.fillRect(0, 0, MM_SIZE, MM_SIZE);
 
-        // Draw cluster dots
+        // Draw cluster dots — only those inside the camera frustum
+        frustumMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        frustum.setFromProjectionMatrix(frustumMatrix);
         for (let i = 0; i < clusters.length; i++) {
           const c = clusters[i];
+          if (!frustum.containsPoint(c.center)) continue;
           const [mx, my] = worldToMinimap(c.center.x, c.center.z);
           mmCtx.beginPath();
           mmCtx.arc(mx, my, 1.5, 0, Math.PI * 2);
@@ -645,12 +688,54 @@
       // ===== KEYBOARD MOVEMENT =====
       const keys = Object.create(null);
 
+      const keystrokeDisplay = document.getElementById("keystroke-display")!;
+      const keyLabels: Record<string, string> = {
+        KeyW: "W", KeyA: "A", KeyS: "S", KeyD: "D",
+        ArrowUp: "↑", ArrowLeft: "←", ArrowDown: "↓", ArrowRight: "→",
+        ShiftLeft: "⇧ Shift", ShiftRight: "⇧ Shift",
+        Space: "Space", KeyP: "P", Escape: "Esc",
+      };
+
+      const activeToasts = new Map<string, HTMLElement>();
+
+      function showKeystroke(label: string, id: string) {
+        if (activeToasts.has(id)) return;
+        const toast = document.createElement("div");
+        toast.className = "kbc-toast kbc-held";
+        toast.innerHTML = `<kbd class="kbc-button">${label}</kbd>`;
+        keystrokeDisplay.appendChild(toast);
+        activeToasts.set(id, toast);
+      }
+
+      function hideKeystroke(id: string) {
+        const toast = activeToasts.get(id);
+        if (!toast) return;
+        activeToasts.delete(id);
+        toast.classList.remove("kbc-held");
+        setTimeout(() => toast.remove(), 200);
+      }
+
       addEventListener("keydown", (e: KeyboardEvent) => {
         keys[e.code] = true;
+        const label = keyLabels[e.code];
+        if (label) showKeystroke(label, e.code);
       });
 
       addEventListener("keyup", (e: KeyboardEvent) => {
         keys[e.code] = false;
+        hideKeystroke(e.code);
+      });
+
+      addEventListener("mousedown", (e: MouseEvent) => {
+        const el = e.target as HTMLElement;
+        if (el?.closest("#help") || el?.closest("#modal")) return;
+        if (e.button === 0) showKeystroke("🖱 Left", "mouse0");
+        if (e.button === 2) showKeystroke("🖱 Right", "mouse2");
+      });
+
+      addEventListener("mouseup", (e: MouseEvent) => {
+        if (e.button === 0) hideKeystroke("mouse0");
+        if (e.button === 2) hideKeystroke("mouse2");
       });
 
       const MOVE = {
@@ -761,9 +846,19 @@
       `;
       }
 
+      // Reset timing state when tab becomes visible again to avoid stale dt/fps
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          last = performance.now();
+          ft = performance.now();
+          fc = 0;
+          fps = 60; // assume good fps until measured
+        }
+      });
+
       function loop(now = performance.now()) {
         requestAnimationFrame(loop);
-        const dt = now - last;
+        const dt = Math.min(now - last, 100); // clamp dt — prevents huge jump on tab return
         last = now;
 
         fc++;
