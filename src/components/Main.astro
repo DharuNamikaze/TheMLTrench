@@ -497,6 +497,33 @@
 
       let currentNavIndex = -1;
 
+      // ===== CONNECTION LINES =====
+      // Fat smooth tubes per adjacent pair in navigableClusters
+      const connLines: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; fromIdx: number; toIdx: number }[] = [];
+
+      for (let i = 0; i < navigableClusters.length - 1; i++) {
+        const a = navigableClusters[i].navPoint as THREE.Vector3;
+        const b = navigableClusters[i + 1].navPoint as THREE.Vector3;
+        // midpoint slightly offset for a gentle curve
+        const mid = new THREE.Vector3().lerpVectors(a, b, 0.5).addScaledVector(
+          new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3(0,1,0)).normalize(),
+          a.distanceTo(b) * 0.08,
+        );
+        const curve = new THREE.CatmullRomCurve3([a, mid, b]);
+        const geo = new THREE.TubeGeometry(curve, 20, 2.5, 8, false);
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0x87ceeb,
+          transparent: true,
+          opacity: 0.75,
+          depthWrite: false,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.frustumCulled = false;
+        mesh.visible = false;
+        scene.add(mesh);
+        connLines.push({ mesh, mat, fromIdx: i, toIdx: i + 1 });
+      }
+
       // ===== CHUNKING =====
       const chunks = new Map();
       let minX = Infinity,
@@ -977,10 +1004,24 @@
               ring.visible = true;
               info.style.display = "block";
               info.innerHTML = `<b>${selectedSphere.concept.name}</b><br><span style="font-size:12px;opacity:.7">${selectedSphere.concept.description}</span>`;
+
+              // Show only lines connected to hovered sphere, hide the rest
+              const hovIdx = navigableClusters.findIndex(
+                (c: any) => c.concept.id === selectedSphere.concept.id,
+              );
+              for (let li = 0; li < connLines.length; li++) {
+                const cl = connLines[li];
+                const isConnected = cl.fromIdx === hovIdx || cl.toIdx === hovIdx;
+                cl.mesh.visible = isConnected;
+              }
             } else {
               selectedSphere = null;
               ring.visible = false;
               info.style.display = "none";
+              // Hide all lines
+              for (let li = 0; li < connLines.length; li++) {
+                connLines[li].mesh.visible = false;
+              }
             }
           }
         }
