@@ -133,32 +133,43 @@
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 6px;
+        gap: 5px;
         pointer-events: none;
       }
       .kbc-toast {
         display: flex;
         gap: 4px;
         align-items: center;
-        animation: kbc-fade-out 0.2s ease forwards;
+        animation: kbc-fade-out 0.25s ease forwards;
       }
       .kbc-toast.kbc-held {
-        animation: none;
-        opacity: 1;
+        animation: kbc-pop-in 0.12s cubic-bezier(0.34,1.56,0.64,1) forwards;
       }
       .kbc-toast .kbc-button {
-        font-size: 11px;
-        min-width: 28px;
-        height: 28px;
-        padding: 0 8px;
-        background: rgba(20, 20, 30, 0.9) !important;
-        border-color: rgba(135, 206, 235, 0.5) !important;
-        color: #cce8ff !important;
-        box-shadow: 0 3px 0 rgba(135,206,235,0.25) !important;
+        font-size: 12px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 10px;
+        background: rgba(10, 15, 30, 0.92) !important;
+        border-color: rgba(135, 206, 235, 0.7) !important;
+        color: #e0f4ff !important;
+        box-shadow: 0 4px 0 rgba(135,206,235,0.35), 0 0 12px rgba(135,206,235,0.15) !important;
+        text-shadow: 0 0 8px rgba(135,206,235,0.8);
+        letter-spacing: 0.05em;
+        transition: box-shadow 0.1s;
+      }
+      .kbc-toast.kbc-held .kbc-button {
+        background: rgba(135, 206, 235, 0.15) !important;
+        box-shadow: 0 2px 0 rgba(135,206,235,0.35), 0 0 18px rgba(135,206,235,0.3) !important;
+        transform: translateY(2px);
+      }
+      @keyframes kbc-pop-in {
+        0%   { opacity: 0; transform: scale(0.75) translateY(6px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
       }
       @keyframes kbc-fade-out {
-        0%   { opacity: 1; transform: translateY(0); }
-        100% { opacity: 0; transform: translateY(-6px); }
+        0%   { opacity: 1; transform: scale(1) translateY(0); }
+        100% { opacity: 0; transform: scale(0.85) translateY(-4px); }
       }
     </style>
   </head>
@@ -537,6 +548,8 @@
       const dummy = new THREE.Object3D();
       const allMeshes: THREE.InstancedMesh[] = [];
       const visibleMeshes: THREE.InstancedMesh[] = [];
+      const allMaterials: THREE.MeshStandardMaterial[] = [];
+      const allSprites: THREE.Sprite[] = [];
 
       // OPTIMIZED: Build all meshes efficiently
       const chunkArray = Array.from(chunks.values());
@@ -559,6 +572,9 @@
             metalness: 0.0,
             roughness: 0.0,
           });
+          // store phase offset for pulse animation
+          (mat as any)._phase = Math.random() * Math.PI * 2;
+          allMaterials.push(mat);
 
           // Glow sprites for this cluster's points
           const glowMat = new THREE.SpriteMaterial({
@@ -577,6 +593,7 @@
             sprite.visible = false;
             scene.add(sprite);
             chunk.sprites.push(sprite);
+            allSprites.push(sprite);
           }
 
           const levels = ["HIGH", "MID", "LOW"] as const;
@@ -966,6 +983,23 @@
               info.style.display = "none";
             }
           }
+        }
+
+        // ===== PULSE ANIMATION =====
+        const t_sec = now * 0.002;
+        for (let i = 0; i < allMaterials.length; i++) {
+          const m = allMaterials[i] as any;
+          const pulse = Math.sin(t_sec * 1.2 + m._phase) * 0.5 + 0.5; // 0..1
+          m.emissiveIntensity = 1.8 + pulse * 14; // 1.8 .. 3.2
+        }
+        for (let i = 0; i < allSprites.length; i++) {
+          const s = allSprites[i];
+          if (!s.visible) continue;
+          const m = s.material as any;
+          const pulse = Math.sin(t_sec * 1.2 + (m._phase ?? 0)) * 0.5 + 0.5;
+          m.opacity = 0.35 + pulse * 0.35; // 0.35 .. 0.7
+          const scale = 55 + pulse * 15; // 55 .. 70
+          s.scale.setScalar(scale);
         }
 
         // OPTIMIZATION: Conditional bloom rendering
