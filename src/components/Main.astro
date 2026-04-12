@@ -499,12 +499,11 @@
 
       // ===== CONNECTION LINES =====
       // Fat smooth tubes per adjacent pair in navigableClusters
-      const connLines: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; fromIdx: number; toIdx: number }[] = [];
+      const connLines: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; curve: THREE.CatmullRomCurve3; fromIdx: number; toIdx: number }[] = [];
 
       for (let i = 0; i < navigableClusters.length - 1; i++) {
         const a = navigableClusters[i].navPoint as THREE.Vector3;
         const b = navigableClusters[i + 1].navPoint as THREE.Vector3;
-        // midpoint slightly offset for a gentle curve
         const mid = new THREE.Vector3().lerpVectors(a, b, 0.5).addScaledVector(
           new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3(0,1,0)).normalize(),
           a.distanceTo(b) * 0.08,
@@ -521,7 +520,7 @@
         mesh.frustumCulled = false;
         mesh.visible = false;
         scene.add(mesh);
-        connLines.push({ mesh, mat, fromIdx: i, toIdx: i + 1 });
+        connLines.push({ mesh, mat, curve, fromIdx: i, toIdx: i + 1 });
       }
 
       // ===== CHUNKING =====
@@ -675,24 +674,38 @@
       const startQuat = new THREE.Quaternion(),
         targetQuat = new THREE.Quaternion();
 
-      function moveCameraToCluster(cluster: any) {
-        const target = cluster.navPoint.clone();
-        const dist = 120;
-        const dir = new THREE.Vector3()
-          .subVectors(camera.position, target)
-          .normalize();
-        if (dir.lengthSq() === 0) dir.set(0, 0, 1);
-        const finalPos = target.clone().addScaledVector(dir, dist);
-        const lookM = new THREE.Matrix4().lookAt(
-          finalPos,
-          target,
-          new THREE.Vector3(0, 1, 0),
+      // Curve travel state
+      let activeCurve: THREE.CatmullRomCurve3 | null = null;
+      let curveReversed = false; // travel b→a when going prev
+      const _curvePt = new THREE.Vector3();
+      const _curvePt2 = new THREE.Vector3();
+      const _lookTarget = new THREE.Vector3();
+
+      function moveCameraToCluster(cluster: any, fromIdx: number, toIdx: number) {
+        // Find a connLine curve between fromIdx and toIdx
+        const conn = connLines.find(
+          cl => (cl.fromIdx === fromIdx && cl.toIdx === toIdx) ||
+                (cl.fromIdx === toIdx   && cl.toIdx === fromIdx)
         );
 
-        startPos.copy(camera.position);
-        targetPos.copy(finalPos);
-        startQuat.copy(camera.quaternion);
-        targetQuat.setFromRotationMatrix(lookM);
+        if (conn) {
+          activeCurve = conn.curve;
+          // if we're going backwards along the curve, reverse it
+          curveReversed = conn.toIdx === fromIdx;
+        } else {
+          // non-adjacent fallback: straight lerp
+          activeCurve = null;
+          const target = cluster.navPoint.clone();
+          const dist = 120;
+          const dir = new THREE.Vector3().subVectors(camera.position, target).normalize();
+          if (dir.lengthSq() === 0) dir.set(0, 0, 1);
+          const finalPos = target.clone().addScaledVector(dir, dist);
+          const lookM = new THREE.Matrix4().lookAt(finalPos, target, new THREE.Vector3(0, 1, 0));
+          startPos.copy(camera.position);
+          targetPos.copy(finalPos);
+          startQuat.copy(camera.quaternion);
+          targetQuat.setFromRotationMatrix(lookM);
+        }
 
         animationStart = performance.now();
         isAnimating = true;
@@ -700,9 +713,9 @@
 
       function gotoIndex(i: number) {
         if (isAnimating || !navigableClusters.length) return;
-        currentNavIndex =
-          (i + navigableClusters.length) % navigableClusters.length;
-        moveCameraToCluster(navigableClusters[currentNavIndex]);
+        const prevIdx = currentNavIndex;
+        currentNavIndex = (i + navigableClusters.length) % navigableClusters.length;
+        moveCameraToCluster(navigableClusters[currentNavIndex], prevIdx, currentNavIndex);
       }
       const gotoNext = () => gotoIndex(currentNavIndex + 1);
       const gotoPrev = () => gotoIndex(currentNavIndex - 1);
@@ -915,15 +928,29 @@
 
         if (isAnimating) {
           const t = Math.min((now - animationStart) / animationDuration, 1);
-          const s = t * t * (3 - 2 * t);
-          camera.position.lerpVectors(startPos, targetPos, s);
-          camera.quaternion.slerpQuaternions(startQuat, targetQuat, s);
+          const s = t * t * (3 - 2 * t); // smoothstep
+
+          if (activeCurve) {
+            // Travel along the tube curve
+            const u = curveReversed ? 1 - s : s;
+            activeCurve.getPoint(u, _curvePt);
+            // look slightly ahead on the curve
+            const uAhead = curveReversed ? Math.max(0, u - 0.02) : Math.min(1, u + 0.02);
+            activeCurve.getPoint(uAhead, _curvePt2);
+            // offset camera slightly above/beside the tube so it doesn't clip
+            const offset = new THREE.Vector3(0, 18, 0);
+            camera.position.copy(_curvePt).add(offset);
+            _lookTarget.copy(_curvePt2).add(offset);
+            camera.lookAt(_lookTarget);
+          } else {
+            camera.position.lerpVectors(startPos, targetPos, s);
+            camera.quaternion.slerpQuaternions(startQuat, targetQuat, s);
+          }
+
           if (t >= 1) {
             isAnimating = false;
-            const eul = new THREE.Euler().setFromQuaternion(
-              camera.quaternion,
-              "YXZ",
-            );
+            activeCurve = null;
+            const eul = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
             rx = eul.x;
             ry = eul.y;
           }
