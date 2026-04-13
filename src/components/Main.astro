@@ -252,7 +252,7 @@
       const camera = new THREE.PerspectiveCamera(
         60,
         innerWidth / innerHeight,
-        0.1,
+        1,
         RENDER_DIST,
       );
       camera.position.set(0, 0, 300);
@@ -268,8 +268,8 @@
       composer.addPass(
         new UnrealBloomPass(
           new THREE.Vector2(innerWidth, innerHeight),
-          1.2,
-          0.6,
+          1.0,
+          0.5,
           0.2,
         ),
       );
@@ -594,9 +594,12 @@
           const mat = new THREE.MeshStandardMaterial({
             color: cluster.color,
             emissive: cluster.color,
-            emissiveIntensity: 2.5,
+            emissiveIntensity: 2.25,
             metalness: 0.0,
             roughness: 0.0,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
           });
           // store phase offset for pulse animation
           (mat as any)._phase = Math.random() * Math.PI * 2;
@@ -1054,15 +1057,15 @@
         for (let i = 0; i < allMaterials.length; i++) {
           const m = allMaterials[i] as any;
           const pulse = Math.sin(t_sec * 1.2 + m._phase) * 0.5 + 0.5; // 0..1
-          m.emissiveIntensity = 1.8 + pulse * 14; // 1.8 .. 3.2
+          m.emissiveIntensity = 1.44 + pulse * 1.12; // ~20% less than before
         }
         for (let i = 0; i < allSprites.length; i++) {
           const s = allSprites[i];
           if (!s.visible) continue;
           const m = s.material as any;
           const pulse = Math.sin(t_sec * 1.2 + (m._phase ?? 0)) * 0.5 + 0.5;
-          m.opacity = 0.35 + pulse * 0.35; // 0.35 .. 0.7
-          const scale = 55 + pulse * 15; // 55 .. 70
+          m.opacity = 0.28 + pulse * 0.28; // 0.28 .. 0.56
+          const scale = 49 + pulse * 12; // 44 .. 56
           s.scale.setScalar(scale);
         }
 
